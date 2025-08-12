@@ -33,5 +33,8 @@ namespace TechstoreBackend.Models
 
         [Column("updated_at")]
         public DateTime? UpdatedAt { get; set; }
+
+        [Column("status")]
+        public string Status { get; set; } = "active"; // active, blocked
     }
 }

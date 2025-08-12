@@ -8,6 +8,7 @@ CREATE TABLE User (
     role ENUM('customer','admin'),
     phone VARCHAR(20),
     address TEXT,
+    status VARCHAR(20) DEFAULT 'active', -- Trạng thái tài khoản: active, blocked
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -215,8 +216,8 @@ DELIMITER ;
 INSERT INTO Category (name, description) VALUES
 ('Điện thoại', 'Các loại điện thoại thông minh, điện thoại phổ thông'),
 ('Laptop', 'Các loại máy tính xách tay, laptop gaming, laptop văn phòng'),
-('Phụ kiện', 'Tai nghe, sạc, cáp, ốp lưng, chuột máy tính');
-    
+('Phụ kiện', 'Tai nghe, sạc, cáp, ốp lưng, chuột máy tính'),
+('Máy tính bảng','Các loại máy tính bảng chính hãng, hiệu năng cao');
 INSERT INTO Product (name, description, price, original_price, brand, stock_quantity, category_id, image_url, specifications, rating, review_count, is_new, is_best_seller) VALUES
 -- Điện thoại
 ('iPhone 15 128GB', 'iPhone 15 chính hãng VN/A, màu đen', 25000000, 27000000, 'Apple', 50, 1, 'https://example.com/images/iphone15.jpg', 

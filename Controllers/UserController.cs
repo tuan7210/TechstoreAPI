@@ -127,28 +127,23 @@ namespace TechstoreBackend.Controllers
                     return BadRequest(new { message = "Email và mật khẩu không được để trống." });
                 }
 
+
                 // Debug logging
                 Console.WriteLine($"Login attempt for email: '{request.Email}'");
-                
-                // Check database connection
                 var totalUsers = await _context.Users.CountAsync();
                 Console.WriteLine($"Total users in database: {totalUsers}");
 
                 // Try to find user with exact email match
                 var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
-                
                 if (user == null)
                 {
                     // Try case-insensitive search
                     user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == request.Email.ToLower());
-                    
                     if (user == null)
                     {
-                        // List all emails for debugging
                         var allEmails = await _context.Users.Select(u => u.Email).ToListAsync();
                         Console.WriteLine($"Available emails in database: {string.Join(", ", allEmails)}");
-                        
-                        return BadRequest(new { 
+                        return BadRequest(new {
                             message = "Email không tồn tại.",
                             searchedEmail = request.Email,
                             availableEmails = allEmails,
@@ -157,25 +152,28 @@ namespace TechstoreBackend.Controllers
                     }
                 }
 
+                // Kiểm tra trạng thái tài khoản
+                if (user.Status == "blocked")
+                {
+                    return Unauthorized(new {
+                        message = "Tài khoản bạn đã tạm thời bị khóa, vui lòng liên hệ admin để biết thêm chi tiết."
+                    });
+                }
+
                 Console.WriteLine($"User found: {user.Email}, Role: {user.Role}");
 
                 // Check password - handle both plain text and BCrypt hash
                 bool isPasswordValid = false;
-                
                 try
                 {
-                    // Try BCrypt verification first
                     isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
                     Console.WriteLine($"BCrypt verification: {isPasswordValid}");
                 }
                 catch (Exception bcryptEx)
                 {
                     Console.WriteLine($"BCrypt error: {bcryptEx.Message}");
-                    // If BCrypt fails, try plain text comparison (for testing)
                     isPasswordValid = request.Password == user.PasswordHash;
                     Console.WriteLine($"Plain text verification: {isPasswordValid}");
-                    
-                    // If plain text matches, update to BCrypt hash
                     if (isPasswordValid)
                     {
                         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
@@ -183,10 +181,9 @@ namespace TechstoreBackend.Controllers
                         Console.WriteLine("Password updated to BCrypt hash");
                     }
                 }
-
                 if (!isPasswordValid)
                 {
-                    return BadRequest(new { 
+                    return BadRequest(new {
                         message = "Mật khẩu không đúng.",
                         passwordLength = request.Password.Length,
                         storedHashLength = user.PasswordHash?.Length ?? 0

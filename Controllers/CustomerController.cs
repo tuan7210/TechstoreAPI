@@ -80,6 +80,15 @@ namespace TechstoreBackend.Controllers
         {
             try
             {
+                // Kiểm tra quyền: chỉ admin hoặc chính khách hàng đó mới có thể xem thông tin
+                var currentUserId = int.Parse(User.FindFirst("UserId")?.Value ?? "0");
+                var isAdmin = User.IsInRole("admin");
+                
+                if (!isAdmin && currentUserId != id)
+                {
+                    return Forbid();
+                }
+                
                 var customer = await _context.Users
                     .Where(u => u.UserId == id && u.Role == "customer")
                     .Select(u => new
@@ -91,6 +100,7 @@ namespace TechstoreBackend.Controllers
                         u.Address,
                         u.CreatedAt,
                         u.UpdatedAt,
+                        u.Status,
                         OrderCount = _context.OrderTables.Count(o => o.UserId == u.UserId),
                         TotalSpent = _context.OrderTables
                             .Where(o => o.UserId == u.UserId && o.PaymentStatus == "paid")
@@ -141,6 +151,15 @@ namespace TechstoreBackend.Controllers
         {
             try
             {
+                // Kiểm tra quyền: chỉ admin hoặc chính khách hàng đó mới có thể cập nhật thông tin
+                var currentUserId = int.Parse(User.FindFirst("UserId")?.Value ?? "0");
+                var isAdmin = User.IsInRole("admin");
+                
+                if (!isAdmin && currentUserId != id)
+                {
+                    return Forbid();
+                }
+                
                 var customer = await _context.Users.FirstOrDefaultAsync(u => u.UserId == id && u.Role == "customer");
                 
                 if (customer == null)
@@ -163,6 +182,22 @@ namespace TechstoreBackend.Controllers
                         });
                     }
                     customer.Email = updateDto.Email;
+                }
+                
+                // Cập nhật trạng thái tài khoản (chỉ admin mới có quyền)
+                if (isAdmin && !string.IsNullOrEmpty(updateDto.Status))
+                {
+                    if (updateDto.Status == "active" || updateDto.Status == "locked")
+                    {
+                        customer.Status = updateDto.Status;
+                    }
+                    else
+                    {
+                        return BadRequest(new { 
+                            success = false,
+                            message = "Trạng thái tài khoản không hợp lệ" 
+                        });
+                    }
                 }
 
                 // Cập nhật thông tin
@@ -190,7 +225,8 @@ namespace TechstoreBackend.Controllers
                         customer.Email,
                         customer.Phone,
                         customer.Address,
-                        customer.UpdatedAt
+                        customer.UpdatedAt,
+                        customer.Status
                     }
                 });
             }
@@ -311,6 +347,232 @@ namespace TechstoreBackend.Controllers
                 return StatusCode(500, new { 
                     success = false,
                     message = "Lỗi khi tìm kiếm khách hàng", 
+                    error = ex.Message 
+                });
+            }
+        }
+
+        // GET: api/Customer/me - Lấy thông tin cá nhân của khách hàng đăng nhập
+        [HttpGet("me")]
+        public async Task<IActionResult> GetMyInfo()
+        {
+            try
+            {
+                var currentUserId = int.Parse(User.FindFirst("UserId")?.Value ?? "0");
+                
+                var customer = await _context.Users
+                    .Where(u => u.UserId == currentUserId && u.Role == "customer")
+                    .Select(u => new
+                    {
+                        u.UserId,
+                        u.Name,
+                        u.Email,
+                        u.Phone,
+                        u.Address,
+                        u.CreatedAt,
+                        u.UpdatedAt,
+                        u.Status,
+                        OrderCount = _context.OrderTables.Count(o => o.UserId == u.UserId),
+                        TotalSpent = _context.OrderTables
+                            .Where(o => o.UserId == u.UserId && o.PaymentStatus == "paid")
+                            .Sum(o => o.TotalAmount),
+                        RecentOrders = _context.OrderTables
+                            .Where(o => o.UserId == u.UserId)
+                            .OrderByDescending(o => o.OrderDate)
+                            .Take(5)
+                            .Select(o => new
+                            {
+                                o.OrderId,
+                                o.OrderDate,
+                                o.Status,
+                                o.TotalAmount,
+                                o.PaymentStatus
+                            })
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (customer == null)
+                {
+                    return NotFound(new { 
+                        success = false,
+                        message = "Không tìm thấy thông tin khách hàng" 
+                    });
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Lấy thông tin cá nhân thành công",
+                    data = customer
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { 
+                    success = false,
+                    message = "Lỗi khi lấy thông tin cá nhân", 
+                    error = ex.Message 
+                });
+            }
+        }
+
+        // PUT: api/Customer/me - Cập nhật thông tin cá nhân của khách hàng đăng nhập
+        [HttpPut("me")]
+        public async Task<IActionResult> UpdateMyInfo([FromBody] CustomerUpdateDto updateDto)
+        {
+            try
+            {
+                var currentUserId = int.Parse(User.FindFirst("UserId")?.Value ?? "0");
+                
+                var customer = await _context.Users.FirstOrDefaultAsync(u => u.UserId == currentUserId && u.Role == "customer");
+                
+                if (customer == null)
+                {
+                    return NotFound(new { 
+                        success = false,
+                        message = "Không tìm thấy thông tin khách hàng" 
+                    });
+                }
+
+                // Kiểm tra email trùng lặp (nếu thay đổi email)
+                if (!string.IsNullOrEmpty(updateDto.Email) && updateDto.Email != customer.Email)
+                {
+                    var emailExists = await _context.Users.AnyAsync(u => u.Email == updateDto.Email && u.UserId != currentUserId);
+                    if (emailExists)
+                    {
+                        return BadRequest(new { 
+                            success = false,
+                            message = "Email đã được sử dụng bởi khách hàng khác" 
+                        });
+                    }
+                    customer.Email = updateDto.Email;
+                }
+
+                // Cập nhật thông tin
+                if (!string.IsNullOrEmpty(updateDto.Name))
+                    customer.Name = updateDto.Name;
+                
+                if (!string.IsNullOrEmpty(updateDto.Phone))
+                    customer.Phone = updateDto.Phone;
+                
+                if (!string.IsNullOrEmpty(updateDto.Address))
+                    customer.Address = updateDto.Address;
+
+                customer.UpdatedAt = DateTime.Now;
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Cập nhật thông tin khách hàng thành công",
+                    data = new
+                    {
+                        customer.UserId,
+                        customer.Name,
+                        customer.Email,
+                        customer.Phone,
+                        customer.Address,
+                        customer.UpdatedAt,
+                        customer.Status
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { 
+                    success = false,
+                    message = "Lỗi khi cập nhật thông tin khách hàng", 
+                    error = ex.Message 
+                });
+            }
+        }
+
+        // PUT: api/Customer/{id}/lock - Khóa tài khoản khách hàng (Admin only)
+        [HttpPut("{id}/lock")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> LockCustomerAccount(int id)
+        {
+            try
+            {
+                var customer = await _context.Users.FirstOrDefaultAsync(u => u.UserId == id && u.Role == "customer");
+                
+                if (customer == null)
+                {
+                    return NotFound(new { 
+                        success = false,
+                        message = "Không tìm thấy khách hàng" 
+                    });
+                }
+
+                customer.Status = "locked";
+                customer.UpdatedAt = DateTime.Now;
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Khóa tài khoản khách hàng thành công",
+                    data = new
+                    {
+                        customer.UserId,
+                        customer.Name,
+                        customer.Email,
+                        customer.Status,
+                        customer.UpdatedAt
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { 
+                    success = false,
+                    message = "Lỗi khi khóa tài khoản khách hàng", 
+                    error = ex.Message 
+                });
+            }
+        }
+
+        // PUT: api/Customer/{id}/unlock - Mở khóa tài khoản khách hàng (Admin only)
+        [HttpPut("{id}/unlock")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> UnlockCustomerAccount(int id)
+        {
+            try
+            {
+                var customer = await _context.Users.FirstOrDefaultAsync(u => u.UserId == id && u.Role == "customer");
+                
+                if (customer == null)
+                {
+                    return NotFound(new { 
+                        success = false,
+                        message = "Không tìm thấy khách hàng" 
+                    });
+                }
+
+                customer.Status = "active";
+                customer.UpdatedAt = DateTime.Now;
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Mở khóa tài khoản khách hàng thành công",
+                    data = new
+                    {
+                        customer.UserId,
+                        customer.Name,
+                        customer.Email,
+                        customer.Status,
+                        customer.UpdatedAt
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { 
+                    success = false,
+                    message = "Lỗi khi mở khóa tài khoản khách hàng", 
                     error = ex.Message 
                 });
             }
