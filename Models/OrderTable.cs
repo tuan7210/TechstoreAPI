@@ -7,23 +7,31 @@ namespace TechstoreBackend.Models
     public class OrderTable
     {
         [Key]
+        [Column("order_id")]
         public int OrderId { get; set; }
 
+        [Column("user_id")]
         [ForeignKey("User")]
         public int UserId { get; set; }
 
+        [Column("order_date")]
         public DateTime OrderDate { get; set; }
 
-        public string Status { get; set; } // 'pending', 'shipped', 'completed', 'canceled'
+        [Column("status")]
+        public string Status { get; set; } = string.Empty; // 'pending', 'shipped', 'completed', 'canceled'
 
+        [Column("total_amount")]
         public decimal TotalAmount { get; set; }
 
-        public string ShippingAddress { get; set; }
+        [Column("shipping_address")]
+        public string ShippingAddress { get; set; } = string.Empty;
 
-        public string PaymentStatus { get; set; } // 'unpaid', 'paid'
+        [Column("payment_status")]
+        public string PaymentStatus { get; set; } = string.Empty; // 'unpaid', 'paid'
 
-        public string PaymentMethod { get; set; }
+        [Column("payment_method")]
+        public string PaymentMethod { get; set; } = string.Empty;
 
-        public User User { get; set; }
+        public User? User { get; set; }
     }
 }

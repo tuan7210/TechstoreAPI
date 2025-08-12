@@ -12,13 +12,19 @@ namespace TechstoreBackend.Models
         public int ProductId { get; set; }
 
         [Column("name")]
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         [Column("description")]
-        public string Description { get; set; }
+        public string Description { get; set; } = string.Empty;
 
         [Column("price")]
         public decimal Price { get; set; }
+
+        [Column("original_price")]
+        public decimal? OriginalPrice { get; set; }
+
+        [Column("brand")]
+        public string Brand { get; set; } = string.Empty;
 
         [Column("stock_quantity")]
         public int StockQuantity { get; set; }
@@ -29,7 +35,22 @@ namespace TechstoreBackend.Models
 
         [Column("image_url")]
         [JsonPropertyName("image_url")]
-        public string ImageUrl { get; set; }
+        public string ImageUrl { get; set; } = string.Empty;
+
+        [Column("specifications")]
+        public string Specifications { get; set; } = string.Empty; // JSON string
+
+        [Column("rating")]
+        public decimal Rating { get; set; }
+
+        [Column("review_count")]
+        public int ReviewCount { get; set; }
+
+        [Column("is_new")]
+        public bool IsNew { get; set; }
+
+        [Column("is_best_seller")]
+        public bool IsBestSeller { get; set; }
 
         [Column("created_at")]
         public DateTime CreatedAt { get; set; }
@@ -38,6 +59,6 @@ namespace TechstoreBackend.Models
         public DateTime UpdatedAt { get; set; }
 
         [JsonIgnore] // Không bắt buộc phải gửi Category trong request
-        public Category Category { get; set; }
+        public Category? Category { get; set; }
     }
 }

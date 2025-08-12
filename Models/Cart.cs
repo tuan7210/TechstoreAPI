@@ -7,11 +7,13 @@ namespace TechstoreBackend.Models
     public class Cart
     {
         [Key]
+        [Column("cart_id")]
         public int CartId { get; set; }
 
+        [Column("user_id")]
         [ForeignKey("User")]
         public int UserId { get; set; }
 
-        public User User { get; set; }
+        public User? User { get; set; }
     }
 }
