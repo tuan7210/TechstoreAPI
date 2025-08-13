@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -81,7 +82,7 @@ namespace TechstoreBackend.Controllers
             try
             {
                 // Kiểm tra quyền: chỉ admin hoặc chính khách hàng đó mới có thể xem thông tin
-                var currentUserId = int.Parse(User.FindFirst("UserId")?.Value ?? "0");
+                var currentUserId = int.Parse(User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value ?? "0");
                 var isAdmin = User.IsInRole("admin");
                 
                 if (!isAdmin && currentUserId != id)
@@ -89,9 +90,9 @@ namespace TechstoreBackend.Controllers
                     return Forbid();
                 }
                 
-                var customer = await _context.Users
-                    .Where(u => u.UserId == id && u.Role == "customer")
-                    .Select(u => new
+                var customer = await _context.Users // teen bang
+                    .Where(u => u.UserId == id && u.Role == "customer") // dieu kien
+                    .Select(u => new  // can cai gi thi lay cai day
                     {
                         u.UserId,
                         u.Name,
@@ -101,22 +102,7 @@ namespace TechstoreBackend.Controllers
                         u.CreatedAt,
                         u.UpdatedAt,
                         u.Status,
-                        OrderCount = _context.OrderTables.Count(o => o.UserId == u.UserId),
-                        TotalSpent = _context.OrderTables
-                            .Where(o => o.UserId == u.UserId && o.PaymentStatus == "paid")
-                            .Sum(o => o.TotalAmount),
-                        RecentOrders = _context.OrderTables
-                            .Where(o => o.UserId == u.UserId)
-                            .OrderByDescending(o => o.OrderDate)
-                            .Take(5)
-                            .Select(o => new
-                            {
-                                o.OrderId,
-                                o.OrderDate,
-                                o.Status,
-                                o.TotalAmount,
-                                o.PaymentStatus
-                            })
+                        
                     })
                     .FirstOrDefaultAsync();
 
@@ -128,11 +114,63 @@ namespace TechstoreBackend.Controllers
                     });
                 }
 
+
+                // 1: lay du lieu
+                var targetUser = _context.Users
+                    .Where(u => u.UserId == id && u.Role == "customer")
+                    .FirstOrDefault();
+
+                // 2. kiem tra du lieu (optional)
+                if (targetUser == null)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = "Không tìm thấy khách hàng"
+                    });
+                }
+
+                // 3. xu ly du lieu
+                targetUser.Phone = "123123";
+
+                // 4. Luu ket qua xu ly
+                _context.Users.Update(targetUser);
+                _context.SaveChanges();
+
+
+
+
+
+
+                var orderCount = _context.OrderTables.Count(o => o.UserId == customer.UserId);
+                var totalSpent = _context.OrderTables
+                    .Where(o => o.UserId == customer.UserId && o.PaymentStatus == "paid")
+                    .Sum(o => o.TotalAmount);
+                var recentOrders = _context.OrderTables
+                    .Where(o => o.UserId == customer.UserId)
+                    .OrderByDescending(o => o.OrderDate)
+                    .Take(5)
+                    .Select(o => new
+                    {
+                        o.OrderId,
+                        o.OrderDate,
+                        o.Status,
+                        o.TotalAmount,
+                        o.PaymentStatus
+                    })
+                    .ToList();
+
                 return Ok(new
                 {
                     success = true,
                     message = "Lấy thông tin khách hàng thành công",
-                    data = customer
+                    data = new
+                    {
+                        Customer = customer,
+                        OrderCount = orderCount,
+                        TotalSpent = totalSpent,
+                        RecentOrders = recentOrders
+                    }
                 });
             }
             catch (Exception ex)

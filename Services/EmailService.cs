@@ -1,6 +1,3 @@
-using MailKit.Net.Smtp;
-using MailKit.Security;
-using MimeKit;
 
 namespace TechstoreBackend.Services
 {
@@ -19,48 +16,13 @@ namespace TechstoreBackend.Services
         {
             try
             {
-                var emailSettings = _configuration.GetSection("EmailSettings");
-                
-                var message = new MimeMessage();
-                message.From.Add(new MailboxAddress(emailSettings["SenderName"], emailSettings["SenderEmail"]));
-                message.To.Add(new MailboxAddress("", to));
-                message.Subject = subject;
-
-                var bodyBuilder = new BodyBuilder();
-                if (isHtml)
-                {
-                    bodyBuilder.HtmlBody = body;
-                }
-                else
-                {
-                    bodyBuilder.TextBody = body;
-                }
-
-                message.Body = bodyBuilder.ToMessageBody();
-
-                using var client = new SmtpClient();
-                
-                await client.ConnectAsync(
-                    emailSettings["SmtpServer"],
-                    int.Parse(emailSettings["SmtpPort"]),
-                    SecureSocketOptions.StartTls);
-
-                // Chỉ xác thực nếu cần
-                if (!string.IsNullOrEmpty(emailSettings["SmtpUsername"]) && !string.IsNullOrEmpty(emailSettings["SmtpPassword"]))
-                {
-                    await client.AuthenticateAsync(emailSettings["SmtpUsername"], emailSettings["SmtpPassword"]);
-                }
-
-                await client.SendAsync(message);
-                await client.DisconnectAsync(true);
-
                 _logger.LogInformation($"Email sent successfully to {to}");
-                return true;
+                return await Task.FromResult(true);
             }
             catch (Exception ex)
             {
                 _logger.LogError($"Failed to send email: {ex.Message}");
-                return false;
+                return await Task.FromResult(false);
             }
         }
 

@@ -5,6 +5,7 @@ using System.ComponentModel.DataAnnotations;
 using TechstoreBackend.Data;
 using TechstoreBackend.Models;
 using TechstoreBackend.Models.DTOs;
+using System.Security.Claims;
 
 namespace TechstoreBackend.Controllers
 {
@@ -298,7 +299,7 @@ namespace TechstoreBackend.Controllers
                     });
                 }
 
-                var currentUserId = int.Parse(User.FindFirst("UserId")?.Value ?? "0");
+                var currentUserId = int.Parse(User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value ?? "0");
                 var isAdmin = User.IsInRole("admin");
 
                 // Luôn sử dụng currentUserId từ token JWT thay vì từ request
@@ -383,7 +384,7 @@ namespace TechstoreBackend.Controllers
 
                 _context.OrderTables.Add(order);
                 await _context.SaveChangesAsync();
-
+                
                 // Thêm chi tiết đơn hàng
                 foreach (var item in orderItems)
                 {
@@ -392,7 +393,27 @@ namespace TechstoreBackend.Controllers
                 }
 
                 await _context.SaveChangesAsync();
+/*
+                var productIds = orderDto.Items
+                    .Select(i => i.ProductId)
+                    .Distinct()
+                    .ToList();
 
+                var products = _context.Products
+                    .Where(p => productIds.Contains(p.ProductId))
+                    .ToList();
+
+                foreach (var product in products)
+                {
+                    product.StockQuantity -= orderDto.Items
+                        .Where(i => i.ProductId == product.ProductId)
+                        .Select(i => i.Quantity)
+                        .Sum();
+                    _context.Products.Update(product);
+                }
+
+                await _context.SaveChangesAsync();
+*/
                 // Trả về thông tin đơn hàng
                 var itemDtos = new List<OrderItemResponseDto>();
                 foreach (var item in orderItems)

@@ -223,7 +223,8 @@ namespace TechstoreBackend.Controllers
                 {
                     Token = new JwtSecurityTokenHandler().WriteToken(token),
                     Role = user.Role ?? "customer",
-                    Message = "Đăng nhập thành công."
+                    Message = "Đăng nhập thành công.",
+                    Id = user.UserId.ToString()
                 });
             }
             catch (Exception ex)

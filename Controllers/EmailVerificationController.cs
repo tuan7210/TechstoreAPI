@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+/*using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TechstoreBackend.Data;
 using TechstoreBackend.Models;
@@ -154,3 +154,4 @@ namespace TechstoreBackend.Controllers
         }
     }
 }
+*/
