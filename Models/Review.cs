@@ -19,6 +19,7 @@ namespace TechstoreBackend.Models
         public int ProductId { get; set; }
 
         [Column("order_item_id")]
+        [ForeignKey("OrderItem")]
         public int OrderItemId { get; set; }
 
         [Column("rating")]
@@ -39,5 +40,6 @@ namespace TechstoreBackend.Models
 
         public User? User { get; set; }
         public Product? Product { get; set; }
+        public OrderItem? OrderItem { get; set; }
     }
 }

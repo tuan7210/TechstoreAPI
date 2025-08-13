@@ -73,7 +73,7 @@ namespace TechstoreBackend.Controllers
                     {
                         OrderId = order.OrderId,
                         UserId = order.UserId,
-                        UserName = order.User?.Name ?? "Unknown",
+                        Username = order.User?.Name ?? "Unknown",
                         OrderDate = order.OrderDate,
                         Status = order.Status,
                         TotalAmount = order.TotalAmount,
@@ -154,7 +154,7 @@ namespace TechstoreBackend.Controllers
                     {
                         OrderId = order.OrderId,
                         UserId = order.UserId,
-                        UserName = "", // Không cần thiết cho user xem đơn hàng của mình
+                        Username = "", // Không cần thiết cho user xem đơn hàng của mình
                         OrderDate = order.OrderDate,
                         Status = order.Status,
                         TotalAmount = order.TotalAmount,
@@ -238,7 +238,7 @@ namespace TechstoreBackend.Controllers
                 {
                     OrderId = order.OrderId,
                     UserId = order.UserId,
-                    UserName = order.User?.Name ?? "Unknown",
+                    Username = order.User?.Name ?? "Unknown",
                     OrderDate = order.OrderDate,
                     Status = order.Status,
                     TotalAmount = order.TotalAmount,
@@ -435,7 +435,7 @@ namespace TechstoreBackend.Controllers
                 {
                     OrderId = order.OrderId,
                     UserId = order.UserId,
-                    UserName = user.Name,
+                    Username = user.Name,
                     OrderDate = order.OrderDate,
                     Status = order.Status,
                     TotalAmount = order.TotalAmount,

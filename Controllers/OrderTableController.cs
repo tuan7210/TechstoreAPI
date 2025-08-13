@@ -39,10 +39,10 @@ namespace TechstoreBackend.Controllers
                             .ToList()
                     });
                 }
-                
+
                 // Ghi log dữ liệu nhận được để debug
                 Console.WriteLine($"Received order data: UserId={orderDto.UserId}, Items={orderDto.Items?.Count ?? 0}, ShippingAddress={orderDto.ShippingAddress}, PaymentMethod={orderDto.PaymentMethod}");
-                
+
                 // Kiểm tra null cho Items
                 if (orderDto.Items == null || orderDto.Items.Count == 0)
                 {
@@ -59,7 +59,7 @@ namespace TechstoreBackend.Controllers
                 // Luôn sử dụng currentUserId từ token JWT thay vì từ request
                 // trừ khi người dùng là admin và rõ ràng đang đặt hàng cho người khác
                 var orderUserId = currentUserId;
-                
+
                 if (isAdmin && orderDto.UserId != 0 && orderDto.UserId != currentUserId)
                 {
                     // Admin có thể đặt hàng cho người khác nếu muốn
@@ -169,7 +169,7 @@ namespace TechstoreBackend.Controllers
                 {
                     OrderId = order.OrderId,
                     UserId = order.UserId,
-                    UserName = user.Name,
+                    Username = user.Name,
                     OrderDate = order.OrderDate,
                     Status = order.Status,
                     TotalAmount = order.TotalAmount,
@@ -196,5 +196,111 @@ namespace TechstoreBackend.Controllers
                 });
             }
         }
+
+        [HttpGet]
+        public async Task<ApiResponse<PagedResult<OrderResponseDto>>> GetOrder([FromQuery] GetOrderRequest request)
+        {
+            var query = _context.OrderTables.AsQueryable();
+            if (!string.IsNullOrEmpty(request.SearchText))
+            {
+                query = query.Where(x => x.User.Name.Contains(request.SearchText));
+            }
+
+            var data = query.Select(x => new OrderResponseDto
+            {
+                OrderId = x.OrderId,
+                Username = x.User.Name,
+                TotalAmount = x.TotalAmount,
+                Status = x.Status,
+                OrderDate = x.OrderDate
+            })
+            //.Skip((request.PageNumber - 1) * request.PageSize)
+            //.Take(request.PageSize)
+            .ToList();
+            return new ApiResponse<PagedResult<OrderResponseDto>>
+            {
+                Success = true,
+                Message = "Lấy danh sách đơn hàng thành công",
+                Data = new PagedResult<OrderResponseDto>
+                {
+                    Items = data,
+                    TotalCount = query.Count()
+                }
+            };
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ApiResponse<OrderResponseDto>> GetOrderById(int id)
+        {
+            var order = await _context.OrderTables
+                .Where(x => x.OrderId == id)
+                .Select(x => new OrderResponseDto
+                {
+                    OrderDate = x.OrderDate,
+                    OrderId = x.OrderId,
+                    UserId = x.UserId,
+                    PaymentMethod = x.PaymentMethod,
+                    PaymentStatus = x.PaymentStatus,
+                    ShippingAddress = x.ShippingAddress,
+                    Status = x.Status,
+                    TotalAmount = x.TotalAmount,
+                    Username = x.User.Name,
+                    Email = x.User.Email,
+                    Phone = x.User.Phone,
+                })
+                .FirstOrDefaultAsync();
+            if (order == null)
+            {
+                return ApiResponse<OrderResponseDto>.ErrorResult("Order not found");
+            }
+
+            var items = await _context.OrderItems
+                .Where(x => x.OrderId == order.OrderId)
+                .Select(x => new OrderItemResponseDto
+                {
+                    OrderItemId = x.OrderItemId,
+                    Price = x.Price,
+                    ProductId = x.ProductId,
+                    ProductName = x.Product.Name,
+                    Quantity = x.Quantity,
+                    Subtotal = x.Quantity * x.Price,
+                }).ToListAsync();
+            
+            order.Items = items;
+
+            return new ApiResponse<OrderResponseDto>
+            {
+                Success = true,
+                Data = order
+            };
+        }
+
+        [HttpPatch("{id}/{status}")]
+        public async Task<ApiResponse<OrderResponseDto>> UpdateOrderStatus(int id, string status)
+        {
+            try
+            {
+                var item = await _context.OrderTables
+                        .Where(x => x.OrderId == id)
+                        .FirstOrDefaultAsync();
+
+                if (item == null)
+                {
+                    return ApiResponse<OrderResponseDto>.ErrorResult("Order not found");
+                }
+
+                item.Status = status;
+                _context.OrderTables.Update(item);
+                await _context.SaveChangesAsync();
+
+                return new ApiResponse<OrderResponseDto> { Success = true };
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+                throw;
+            }
+        }
+
     }
 }

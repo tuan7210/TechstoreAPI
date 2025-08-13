@@ -186,7 +186,7 @@ namespace TechstoreBackend.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<ApiResponse<ProductResponseDto>>> CreateProduct(ProductCreateDto productDto)
+        public async Task<ActionResult<ApiResponse<ProductResponseDto>>> CreateProduct([FromForm] ProductCreateDto productDto)
         {
             try
             {
@@ -206,6 +206,13 @@ namespace TechstoreBackend.Controllers
                     return BadRequest(ApiResponse<ProductResponseDto>.ErrorResult("Danh mục không tồn tại"));
                 }
 
+                // Handle file upload
+                string? imageFileName = null;
+                if (productDto.File != null)
+                {
+                    imageFileName = await SaveFileAsync(productDto.File);
+                }
+
                 var product = new Product
                 {
                     Name = productDto.Name,
@@ -215,7 +222,7 @@ namespace TechstoreBackend.Controllers
                     Brand = productDto.Brand,
                     StockQuantity = productDto.StockQuantity,
                     CategoryId = productDto.CategoryId,
-                    ImageUrl = productDto.ImageUrl,
+                    ImageUrl = imageFileName ?? productDto.ImageUrl,
                     Specifications = productDto.Specifications ?? "{}",
                     IsNew = productDto.IsNew,
                     IsBestSeller = productDto.IsBestSeller,
@@ -268,7 +275,7 @@ namespace TechstoreBackend.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<ActionResult<ApiResponse<ProductResponseDto>>> UpdateProduct(int id, ProductUpdateDto productDto)
+        public async Task<ActionResult<ApiResponse<ProductResponseDto>>> UpdateProduct(int id, [FromForm] ProductUpdateDto productDto)
         {
             try
             {
@@ -299,6 +306,13 @@ namespace TechstoreBackend.Controllers
                     return BadRequest(ApiResponse<ProductResponseDto>.ErrorResult("Danh mục không tồn tại"));
                 }
 
+                // Handle file upload
+                string? imageFileName = null;
+                if (productDto.File != null)
+                {
+                    imageFileName = await SaveFileAsync(productDto.File);
+                }
+
                 // Update product
                 existingProduct.Name = productDto.Name;
                 existingProduct.Description = productDto.Description;
@@ -307,7 +321,7 @@ namespace TechstoreBackend.Controllers
                 existingProduct.Brand = productDto.Brand;
                 existingProduct.StockQuantity = productDto.StockQuantity;
                 existingProduct.CategoryId = productDto.CategoryId;
-                existingProduct.ImageUrl = productDto.ImageUrl;
+                existingProduct.ImageUrl = imageFileName ?? productDto.ImageUrl ?? existingProduct.ImageUrl;
                 existingProduct.Specifications = productDto.Specifications ?? "{}";
                 existingProduct.IsNew = productDto.IsNew;
                 existingProduct.IsBestSeller = productDto.IsBestSeller;
@@ -444,6 +458,33 @@ namespace TechstoreBackend.Controllers
             catch
             {
                 return specifications; // Return as string if JSON parsing fails
+            }
+        }
+
+        private async Task<string> SaveFileAsync(IFormFile file)
+        {
+            try
+            {
+                var uploadPath = @"D:\ImageStorage";
+                if (!Directory.Exists(uploadPath))
+                {
+                    Directory.CreateDirectory(uploadPath);
+                }
+
+                var fileExtension = Path.GetExtension(file.FileName);
+                var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
+                var filePath = Path.Combine(uploadPath, uniqueFileName);
+
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                return uniqueFileName;
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Error saving file: {ex.Message}", ex);
             }
         }
     }

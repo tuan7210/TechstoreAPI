@@ -7,8 +7,6 @@ namespace TechstoreBackend.Models.DTOs
         [Required(ErrorMessage = "Tên sản phẩm là bắt buộc")]
         [StringLength(255, ErrorMessage = "Tên sản phẩm không được vượt quá 255 ký tự")]
         public string Name { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = "Mô tả sản phẩm là bắt buộc")]
         public string Description { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Giá sản phẩm là bắt buộc")]
@@ -28,10 +26,9 @@ namespace TechstoreBackend.Models.DTOs
 
         [Required(ErrorMessage = "Danh mục sản phẩm là bắt buộc")]
         public int CategoryId { get; set; }
-
-        [Required(ErrorMessage = "Hình ảnh sản phẩm là bắt buộc")]
-        [Url(ErrorMessage = "URL hình ảnh không hợp lệ")]
         public string ImageUrl { get; set; } = string.Empty;
+
+        public IFormFile? File { get; set; }
 
         public string? Specifications { get; set; } // JSON string
 

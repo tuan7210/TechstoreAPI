@@ -153,10 +153,22 @@ namespace TechstoreBackend.Controllers
                 }
 
                 // Kiểm tra trạng thái tài khoản
-                if (user.Status == "blocked")
+                if (user.Status == "blocked" || user.Status == "locked")
                 {
                     return Unauthorized(new {
-                        message = "Tài khoản bạn đã tạm thời bị khóa, vui lòng liên hệ admin để biết thêm chi tiết."
+                        success = false,
+                        message = "Tài khoản của bạn đã bị khóa, vui lòng liên hệ admin để biết thêm chi tiết.",
+                        status = user.Status
+                    });
+                }
+
+                // Chỉ cho phép tài khoản active đăng nhập
+                if (user.Status != "active")
+                {
+                    return Unauthorized(new {
+                        success = false,
+                        message = "Tài khoản của bạn chưa được kích hoạt hoặc đang bị tạm ngưng.",
+                        status = user.Status
                     });
                 }
 
@@ -207,7 +219,9 @@ namespace TechstoreBackend.Controllers
                 var claims = new[]
                 {
                     new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
+                    new Claim("UserId", user.UserId.ToString()), // Thêm claim UserId tùy chỉnh
                     new Claim(ClaimTypes.Email, user.Email),
+                    new Claim(ClaimTypes.Name, user.Name ?? ""),
                     new Claim(ClaimTypes.Role, user.Role ?? "customer")
                 };
 
@@ -221,10 +235,13 @@ namespace TechstoreBackend.Controllers
 
                 return Ok(new LoginResponse
                 {
+                    Success = true,
                     Token = new JwtSecurityTokenHandler().WriteToken(token),
                     Role = user.Role ?? "customer",
                     Message = "Đăng nhập thành công.",
-                    Id = user.UserId.ToString()
+                    Id = user.UserId.ToString(),
+                    Name = user.Name ?? "",
+                    Email = user.Email ?? ""
                 });
             }
             catch (Exception ex)
