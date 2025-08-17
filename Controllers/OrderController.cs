@@ -21,6 +21,186 @@ namespace TechstoreBackend.Controllers
             _context = context;
         }
 
+        // GET: api/Order/revenue?type=day|month|year&date=yyyy-MM-dd
+        [HttpGet("revenue")]
+       // [Authorize(Roles = "admin")]
+        public async Task<IActionResult> GetRevenue([FromQuery] string type = "day", [FromQuery] string? date = null)
+        {
+            try
+            {
+                DateTime targetDate = DateTime.Today;
+                if (!string.IsNullOrEmpty(date))
+                {
+                    if (!DateTime.TryParse(date, out targetDate))
+                    {
+                        return BadRequest(new { success = false, message = "Sai định dạng ngày. Định dạng đúng: yyyy-MM-dd" });
+                    }
+                }
+                IQueryable<OrderTable> query = _context.OrderTables.Where(o => o.PaymentStatus == "paid");
+                decimal totalRevenue = 0;
+                if (type == "day")
+                {
+                    totalRevenue = await query.Where(o => o.OrderDate.Date == targetDate.Date).SumAsync(o => (decimal?)o.TotalAmount) ?? 0;
+                }
+                else if (type == "month")
+                {
+                    totalRevenue = await query.Where(o => o.OrderDate.Month == targetDate.Month && o.OrderDate.Year == targetDate.Year).SumAsync(o => (decimal?)o.TotalAmount) ?? 0;
+                }
+                else if (type == "year")
+                {
+                    totalRevenue = await query.Where(o => o.OrderDate.Year == targetDate.Year).SumAsync(o => (decimal?)o.TotalAmount) ?? 0;
+                }
+                else
+                {
+                    return BadRequest(new { success = false, message = "type chỉ nhận giá trị: day, month, year" });
+                }
+                return Ok(new { success = true, message = "Thống kê doanh thu thành công", data = new { type, date = targetDate.ToString("yyyy-MM-dd"), totalRevenue } });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Lỗi khi thống kê doanh thu", error = ex.Message });
+            }
+        }
+
+        // GET: api/Order/today-count
+        [HttpGet("today-count")]
+        
+        public async Task<IActionResult> GetTodayOrderCount()
+        {
+            try
+            {
+                var today = DateTime.Today;
+                int count = await _context.OrderTables.CountAsync(o => o.OrderDate.Date == today);
+                return Ok(new { success = true, message = "Lấy số đơn hàng hôm nay thành công", data = new { count } });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Lỗi khi lấy số đơn hàng hôm nay", error = ex.Message });
+            }
+        }
+
+        // GET: api/Order/paid-today
+        [HttpGet("paid-today")]
+        //[Authorize(Roles = "admin")]
+        public async Task<IActionResult> GetPaidOrdersToday()
+        {
+            try
+            {
+                var today = DateTime.Today;
+                var orders = await _context.OrderTables
+                    .Where(o => o.PaymentStatus == "paid" && o.OrderDate.Date == today)
+                    .OrderByDescending(o => o.OrderDate)
+                    .ToListAsync();
+
+                var orderDtos = new List<OrderResponseDto>();
+                foreach (var order in orders)
+                {
+                    var items = await _context.OrderItems
+                        .Include(oi => oi.Product)
+                        .Where(oi => oi.OrderId == order.OrderId)
+                        .ToListAsync();
+
+                    var itemDtos = items.Select(item => new OrderItemResponseDto
+                    {
+                        OrderItemId = item.OrderItemId,
+                        ProductId = item.ProductId,
+                        ProductName = item.Product?.Name ?? "Unknown",
+                        ImageUrl = item.Product?.ImageUrl ?? "",
+                        Quantity = item.Quantity,
+                        Price = item.Price,
+                        Subtotal = item.Price * item.Quantity
+                    }).ToList();
+
+                    orderDtos.Add(new OrderResponseDto
+                    {
+                        OrderId = order.OrderId,
+                        UserId = order.UserId,
+                        Username = "",
+                        OrderDate = order.OrderDate,
+                        Status = order.Status,
+                        TotalAmount = order.TotalAmount,
+                        ShippingAddress = order.ShippingAddress,
+                        PaymentStatus = order.PaymentStatus,
+                        PaymentMethod = order.PaymentMethod,
+                        Items = itemDtos
+                    });
+                }
+                return Ok(new { success = true, message = "Lấy danh sách đơn hàng đã thanh toán hôm nay thành công", data = orderDtos });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Lỗi khi lấy đơn hàng đã thanh toán hôm nay", error = ex.Message });
+            }
+        }
+
+        // PUT: api/Order/{id}/cancel - Khách hàng tự hủy đơn hàng của mình khi trạng thái là 'pending'
+        [HttpPut("{id}/cancel")]
+        [Authorize] // Chỉ cần đăng nhập
+        public async Task<IActionResult> CancelOrderByUser(int id)
+        {
+            try
+            {
+                var currentUserId = int.Parse(User.FindFirst("UserId")?.Value ?? "0");
+                var order = await _context.OrderTables.FindAsync(id);
+                if (order == null)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = "Không tìm thấy đơn hàng"
+                    });
+                }
+                // Chỉ chủ đơn hàng mới được hủy
+                if (order.UserId != currentUserId)
+                {
+                    return Forbid();
+                }
+                // Chỉ cho phép hủy khi trạng thái là 'pending' (chờ xác nhận)
+                if (order.Status != "pending")
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "Chỉ có thể hủy đơn hàng khi đang chờ xác nhận"
+                    });
+                }
+                // Đánh dấu trạng thái là 'canceled'
+                order.Status = "canceled";
+                // Hoàn lại số lượng sản phẩm
+                var orderItems = await _context.OrderItems.Where(oi => oi.OrderId == id).ToListAsync();
+                foreach (var item in orderItems)
+                {
+                    var product = await _context.Products.FindAsync(item.ProductId);
+                    if (product != null)
+                    {
+                        product.StockQuantity += item.Quantity;
+                        _context.Products.Update(product);
+                    }
+                }
+                _context.OrderTables.Update(order);
+                await _context.SaveChangesAsync();
+                return Ok(new
+                {
+                    success = true,
+                    message = "Đã hủy đơn hàng thành công",
+                    data = new
+                    {
+                        orderId = order.OrderId,
+                        status = order.Status
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Lỗi khi hủy đơn hàng",
+                    error = ex.Message
+                });
+            }
+        }
+
         // GET: api/Order - Lấy danh sách đơn hàng (admin)
         [HttpGet]
         [Authorize(Roles = "admin")]
@@ -242,7 +422,7 @@ namespace TechstoreBackend.Controllers
                     OrderDate = order.OrderDate,
                     Status = order.Status,
                     TotalAmount = order.TotalAmount,
-                    ShippingAddress = order.ShippingAddress,
+                    ShippingAddress = order.User?.Address ?? string.Empty,
                     PaymentStatus = order.PaymentStatus,
                     PaymentMethod = order.PaymentMethod,
                     Items = itemDtos
@@ -285,10 +465,6 @@ namespace TechstoreBackend.Controllers
                             .ToList()
                     });
                 }
-                
-                // Ghi log dữ liệu nhận được để debug
-                Console.WriteLine($"Received order data: UserId={orderDto.UserId}, Items={orderDto.Items?.Count ?? 0}, ShippingAddress={orderDto.ShippingAddress}, PaymentMethod={orderDto.PaymentMethod}");
-                
                 // Kiểm tra null cho Items
                 if (orderDto.Items == null || orderDto.Items.Count == 0)
                 {
@@ -377,7 +553,6 @@ namespace TechstoreBackend.Controllers
                     OrderDate = DateTime.Now,
                     Status = "pending",
                     TotalAmount = totalAmount,
-                    ShippingAddress = orderDto.ShippingAddress,
                     PaymentStatus = "unpaid",
                     PaymentMethod = orderDto.PaymentMethod
                 };
@@ -491,10 +666,11 @@ namespace TechstoreBackend.Controllers
                     });
                 }
 
+                var oldStatus = order.Status;
                 order.Status = updateDto.Status;
-                
+
                 // Nếu đơn hàng bị hủy, hoàn lại số lượng sản phẩm
-                if (updateDto.Status == "canceled" && order.Status != "canceled")
+                if (updateDto.Status == "canceled" && oldStatus != "canceled")
                 {
                     var orderItems = await _context.OrderItems
                         .Where(oi => oi.OrderId == id)
@@ -511,11 +687,7 @@ namespace TechstoreBackend.Controllers
                     }
                 }
 
-                // Nếu trạng thái là delivered, đánh dấu là đã thanh toán
-                if (updateDto.Status == "delivered")
-                {
-                    order.PaymentStatus = "paid";
-                }
+                // Không tự động cập nhật paymentStatus khi chuyển trạng thái đơn hàng nữa
 
                 _context.OrderTables.Update(order);
                 await _context.SaveChangesAsync();
@@ -596,6 +768,54 @@ namespace TechstoreBackend.Controllers
                 });
             }
         }
+            // PUT: api/Order/{id}/confirm-payment - Admin xác nhận đã thanh toán đơn hàng
+            [HttpPut("{id}/confirm-payment")]
+            [Authorize(Roles = "admin")]
+            public async Task<IActionResult> ConfirmPayment(int id)
+            {
+                try
+                {
+                    var order = await _context.OrderTables.FindAsync(id);
+                    if (order == null)
+                    {
+                        return NotFound(new
+                        {
+                            success = false,
+                            message = "Không tìm thấy đơn hàng"
+                        });
+                    }
+                    if (order.PaymentStatus == "paid")
+                    {
+                        return BadRequest(new
+                        {
+                            success = false,
+                            message = "Đơn hàng đã được xác nhận thanh toán trước đó"
+                        });
+                    }
+                    order.PaymentStatus = "paid";
+                    _context.OrderTables.Update(order);
+                    await _context.SaveChangesAsync();
+                    return Ok(new
+                    {
+                        success = true,
+                        message = "Xác nhận thanh toán thành công",
+                        data = new
+                        {
+                            orderId = order.OrderId,
+                            paymentStatus = order.PaymentStatus
+                        }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    return StatusCode(500, new
+                    {
+                        success = false,
+                        message = "Lỗi khi xác nhận thanh toán",
+                        error = ex.Message
+                    });
+                }
+            }
 
         // DELETE: api/Order/{id} - Xóa đơn hàng (admin only)
         [HttpDelete("{id}")]

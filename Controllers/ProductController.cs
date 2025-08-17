@@ -445,6 +445,56 @@ namespace TechstoreBackend.Controllers
             return await GetProducts(query);
         }
 
+        [HttpGet("image/{fileName}")]
+        public async Task<IActionResult> GetImage(string fileName)
+        {
+            try
+            {
+                var imagePath = Path.Combine(@"D:\ImageStorage", fileName);
+                
+                if (!System.IO.File.Exists(imagePath))
+                {
+                    return NotFound("Không tìm thấy ảnh");
+                }
+
+                var fileInfo = new FileInfo(imagePath);
+                var fileExtension = Path.GetExtension(fileName).ToLowerInvariant();
+                var contentType = fileExtension switch
+                {
+                    ".jpg" or ".jpeg" => "image/jpeg",
+                    ".png" => "image/png",
+                    ".gif" => "image/gif",
+                    ".bmp" => "image/bmp",
+                    ".webp" => "image/webp",
+                    _ => "application/octet-stream"
+                };
+
+                // Thêm cache headers để tối ưu hiệu suất
+                Response.Headers["Cache-Control"] = "public, max-age=31536000"; // Cache 1 năm
+                Response.Headers["Expires"] = DateTime.UtcNow.AddYears(1).ToString("R");
+                Response.Headers["Last-Modified"] = fileInfo.LastWriteTimeUtc.ToString("R");
+
+                // Kiểm tra If-Modified-Since header
+                if (Request.Headers.ContainsKey("If-Modified-Since"))
+                {
+                    if (DateTime.TryParse(Request.Headers["If-Modified-Since"], out var ifModifiedSince))
+                    {
+                        if (fileInfo.LastWriteTimeUtc <= ifModifiedSince.AddSeconds(1))
+                        {
+                            return StatusCode(304); // Not Modified
+                        }
+                    }
+                }
+
+                var fileBytes = await System.IO.File.ReadAllBytesAsync(imagePath);
+                return File(fileBytes, contentType);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi khi tải ảnh: {ex.Message}");
+            }
+        }
+
         // Helper method to parse JSON specifications
         private object? ParseSpecifications(string? specifications)
         {

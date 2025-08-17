@@ -44,6 +44,7 @@ namespace TechstoreBackend.Controllers
                         u.Phone,
                         u.Address,
                         u.CreatedAt,
+                        u.Status, // Thêm trường trạng thái tài khoản
                         OrderCount = _context.OrderTables.Count(o => o.UserId == u.UserId),
                         TotalSpent = _context.OrderTables
                             .Where(o => o.UserId == u.UserId && o.PaymentStatus == "paid")
@@ -130,8 +131,7 @@ namespace TechstoreBackend.Controllers
                     });
                 }
 
-                // 3. xu ly du lieu
-                targetUser.Phone = "123123";
+                
 
                 // 4. Luu ket qua xu ly
                 _context.Users.Update(targetUser);
@@ -251,7 +251,6 @@ namespace TechstoreBackend.Controllers
                 customer.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
-
                 return Ok(new
                 {
                     success = true,

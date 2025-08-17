@@ -21,6 +21,112 @@ namespace TechstoreBackend.Controllers
             _logger = logger;
         }
 
+        // GET: api/ProductReview/all - Lấy tất cả review (admin, bao gồm cả review bị ẩn), có phân trang
+        [HttpGet("all")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> GetAllReviews([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] int? productId = null, [FromQuery] bool? isVerified = null)
+        {
+            try
+            {
+                var query = _context.Reviews
+                    .Include(r => r.User)
+                    .Include(r => r.OrderItem)
+                    .ThenInclude(oi => oi.OrderTable)
+                    .AsQueryable();
+
+                if (productId.HasValue)
+                    query = query.Where(r => r.ProductId == productId.Value);
+                if (isVerified.HasValue)
+                    query = query.Where(r => r.IsVerified == isVerified.Value);
+
+                var totalCount = await query.CountAsync();
+                var reviews = await query
+                    .OrderByDescending(r => r.CreatedAt)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .Select(r => new ProductReviewDto
+                    {
+                        ReviewId = r.ReviewId,
+                        UserName = r.User.Name,
+                        Rating = r.Rating,
+                        Comment = r.Comment,
+                        CreatedAt = r.CreatedAt,
+                        IsVerified = r.IsVerified
+                    })
+                    .ToListAsync();
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Lấy danh sách review thành công",
+                    data = new
+                    {
+                        reviews = reviews,
+                        pagination = new
+                        {
+                            page = page,
+                            pageSize = pageSize,
+                            totalCount = totalCount,
+                            totalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+                        }
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi lấy danh sách review cho admin");
+                return StatusCode(500, new { success = false, message = "Lỗi khi lấy danh sách review", error = ex.Message });
+            }
+        }
+
+        // PATCH: api/ProductReview/{id}/verify - Ẩn/hiện review (admin)
+        [HttpPatch("{id}/verify")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> VerifyReview(int id, [FromBody] VerifyReviewDto dto)
+        {
+            try
+            {
+                var review = await _context.Reviews.FindAsync(id);
+                if (review == null)
+                {
+                    return NotFound(new { success = false, message = "Không tìm thấy review" });
+                }
+                review.IsVerified = dto.IsVerified;
+                review.UpdatedAt = DateTime.Now;
+                await _context.SaveChangesAsync();
+                // Cập nhật lại rating sản phẩm nếu review được duyệt hoặc bị ẩn
+                await UpdateProductRatingAsync(review.ProductId);
+                return Ok(new { success = true, message = "Cập nhật trạng thái duyệt review thành công", isVerified = review.IsVerified });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi cập nhật trạng thái duyệt review {ReviewId}", id);
+                return StatusCode(500, new { success = false, message = "Lỗi khi cập nhật trạng thái duyệt review", error = ex.Message });
+            }
+        }
+        // DELETE: api/ProductReview/{id} - Xóa review (admin)
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> DeleteReview(int id)
+        {
+            try
+            {
+                var review = await _context.Reviews.FindAsync(id);
+                if (review == null)
+                {
+                    return NotFound(new { success = false, message = "Không tìm thấy review" });
+                }
+                _context.Reviews.Remove(review);
+                await _context.SaveChangesAsync();
+                return Ok(new { success = true, message = "Xóa review thành công" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi xóa review {ReviewId}", id);
+                return StatusCode(500, new { success = false, message = "Lỗi khi xóa review", error = ex.Message });
+            }
+        }
+
         // GET: api/ProductReview/product/{productId} - Lấy đánh giá của sản phẩm (Public)
         [HttpGet("product/{productId}")]
         public async Task<IActionResult> GetProductReviews(int productId, [FromQuery] ReviewQueryDto query)
@@ -164,7 +270,7 @@ namespace TechstoreBackend.Controllers
                 }
 
                 // Kiểm tra đơn hàng đã giao thành công chưa
-                if (orderItem.OrderTable.Status != "completed")
+                if (orderItem.OrderTable.Status != "completed" && orderItem.OrderTable.Status != "delivered")
                 {
                     return BadRequest(new
                     {
@@ -195,7 +301,7 @@ namespace TechstoreBackend.Controllers
                     OrderItemId = reviewDto.OrderItemId,
                     Rating = reviewDto.Rating,
                     Comment = reviewDto.Comment ?? string.Empty,
-                    IsVerified = false, // Mặc định chưa duyệt
+                    IsVerified = true, // Mặc định chưa duyệt
                     CreatedAt = DateTime.Now,
                     UpdatedAt = DateTime.Now
                 };

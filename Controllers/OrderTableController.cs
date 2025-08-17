@@ -40,9 +40,6 @@ namespace TechstoreBackend.Controllers
                     });
                 }
 
-                // Ghi log dữ liệu nhận được để debug
-                Console.WriteLine($"Received order data: UserId={orderDto.UserId}, Items={orderDto.Items?.Count ?? 0}, ShippingAddress={orderDto.ShippingAddress}, PaymentMethod={orderDto.PaymentMethod}");
-
                 // Kiểm tra null cho Items
                 if (orderDto.Items == null || orderDto.Items.Count == 0)
                 {
@@ -131,7 +128,6 @@ namespace TechstoreBackend.Controllers
                     OrderDate = DateTime.Now,
                     Status = "pending",
                     TotalAmount = totalAmount,
-                    ShippingAddress = orderDto.ShippingAddress,
                     PaymentStatus = "unpaid",
                     PaymentMethod = orderDto.PaymentMethod
                 };
@@ -241,7 +237,7 @@ namespace TechstoreBackend.Controllers
                     UserId = x.UserId,
                     PaymentMethod = x.PaymentMethod,
                     PaymentStatus = x.PaymentStatus,
-                    ShippingAddress = x.ShippingAddress,
+                    ShippingAddress = x.User != null ? x.User.Address : string.Empty,
                     Status = x.Status,
                     TotalAmount = x.TotalAmount,
                     Username = x.User.Name,
@@ -290,6 +286,7 @@ namespace TechstoreBackend.Controllers
                 }
 
                 item.Status = status;
+                item.PaymentStatus = status;
                 _context.OrderTables.Update(item);
                 await _context.SaveChangesAsync();
 
