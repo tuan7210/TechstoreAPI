@@ -213,6 +213,12 @@ BEGIN
     WHERE product_id = OLD.product_id;
 END//
 DELIMITER ;
+-- Thêm tài khoản admin mặc định
+
+INSERT INTO User (name, email, password_hash, role, phone, address, status)
+VALUES ('Administrator', 'admin@example.com', '$2a$11$LW/kugJ.FEoHUCLP0KASp.umaQEFQYJjTxQFP5XNx//3eUVmStvXi', 'admin', '0123456789', 'Hà Nội, Việt Nam', 'active'),
+       ('Nguyen Van B', 'customer@example.com', '$2a$11$LW/kugJ.FEoHUCLP0KASp.umaQEFQYJjTxQFP5XNx//3eUVmStvXi', 'customer', '0987654321', 'TP.HCM, Việt Nam', 'active');
+
 INSERT INTO Category (name, description) VALUES
 ('Điện thoại', 'Các loại điện thoại thông minh, điện thoại phổ thông'),
 ('Laptop', 'Các loại máy tính xách tay, laptop gaming, laptop văn phòng'),
