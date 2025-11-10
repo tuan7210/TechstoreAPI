@@ -15,5 +15,8 @@ namespace TechstoreBackend.Models
         public int UserId { get; set; }
 
         public User? User { get; set; }
+
+        // Navigation property for cart items
+        public virtual ICollection<CartItem> Items { get; set; } = new List<CartItem>();
     }
 }

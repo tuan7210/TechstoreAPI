@@ -1,12 +1,59 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations;
-using TechstoreBackend.Data;
-using TechstoreBackend.Models;
-using TechstoreBackend.Models.DTOs;
-using System.Security.Claims;
 
+        using Microsoft.AspNetCore.Authorization;
+        using Microsoft.AspNetCore.Mvc;
+        using Microsoft.EntityFrameworkCore;
+        using System.ComponentModel.DataAnnotations;
+        using TechstoreBackend.Data;
+        using TechstoreBackend.Models;
+        using TechstoreBackend.Models.DTOs;
+        using System.Security.Claims;
+
+        namespace TechstoreBackend.Controllers
+        {
+    [Route("api/[controller]")]
+    [ApiController]
+    [Authorize]
+    public class OrderController : ControllerBase
+    {
+        private readonly AppDbContext _context;
+
+        public OrderController(AppDbContext context)
+        {
+            _context = context;
+        }
+
+        // POST: api/Order/check-cart-stock - Kiểm tra sản phẩm trong giỏ hàng còn hàng không
+        [HttpPost("check-cart-stock")]
+        [AllowAnonymous]
+        public async Task<IActionResult> CheckCartStock([FromBody] List<CartItemDto> cartItems)
+        {
+            if (cartItems == null || cartItems.Count == 0)
+            {
+                return BadRequest(new { success = false, message = "Giỏ hàng trống" });
+            }
+
+            var outOfStockProducts = new List<object>();
+            foreach (var item in cartItems)
+            {
+                var product = await _context.Products.FindAsync(item.ProductId);
+                if (product == null)
+                {
+                    outOfStockProducts.Add(new { ProductId = item.ProductId, Message = "Sản phẩm không tồn tại" });
+                }
+                else if (product.StockQuantity < item.Quantity)
+                {
+                    outOfStockProducts.Add(new { ProductId = item.ProductId, ProductName = product.Name, Message = "Sản phẩm đã hết hàng hoặc không đủ số lượng" });
+                }
+            }
+
+            if (outOfStockProducts.Count > 0)
+            {
+                return Ok(new { success = false, message = "Một số sản phẩm trong giỏ hàng đã hết hàng hoặc không đủ số lượng", outOfStock = outOfStockProducts });
+            }
+
+            return Ok(new { success = true, message = "Tất cả sản phẩm trong giỏ hàng đều còn hàng" });
+        }
+    }
 namespace TechstoreBackend.Controllers
 {
     [Route("api/[controller]")]
@@ -882,4 +929,5 @@ namespace TechstoreBackend.Controllers
         [Required(ErrorMessage = "Trạng thái thanh toán là bắt buộc")]
         public string PaymentStatus { get; set; } = string.Empty;
     }
+}
 }
