@@ -129,7 +129,8 @@ namespace TechstoreBackend.Controllers
                     Status = "pending",
                     TotalAmount = totalAmount,
                     PaymentStatus = "unpaid",
-                    PaymentMethod = orderDto.PaymentMethod
+                    PaymentMethod = orderDto.PaymentMethod,
+                    ShippingAddress = orderDto.ShippingAddress // Lưu địa chỉ giao hàng
                 };
 
                 _context.OrderTables.Add(order);
@@ -237,7 +238,7 @@ namespace TechstoreBackend.Controllers
                     UserId = x.UserId,
                     PaymentMethod = x.PaymentMethod,
                     PaymentStatus = x.PaymentStatus,
-                    ShippingAddress = x.User != null ? x.User.Address : string.Empty,
+                    ShippingAddress = x.ShippingAddress,
                     Status = x.Status,
                     TotalAmount = x.TotalAmount,
                     Username = x.User.Name,

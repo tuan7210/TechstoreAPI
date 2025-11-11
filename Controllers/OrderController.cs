@@ -8,8 +8,10 @@
         using TechstoreBackend.Models.DTOs;
         using System.Security.Claims;
 
-        namespace TechstoreBackend.Controllers
-        {
+        // duplicate temporary controller wrapper removed; method moved into main controller below
+
+namespace TechstoreBackend.Controllers
+{
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
@@ -52,20 +54,6 @@
             }
 
             return Ok(new { success = true, message = "Tất cả sản phẩm trong giỏ hàng đều còn hàng" });
-        }
-    }
-namespace TechstoreBackend.Controllers
-{
-    [Route("api/[controller]")]
-    [ApiController]
-    [Authorize]
-    public class OrderController : ControllerBase
-    {
-        private readonly AppDbContext _context;
-
-        public OrderController(AppDbContext context)
-        {
-            _context = context;
         }
 
         // GET: api/Order/revenue?type=day|month|year&date=yyyy-MM-dd
@@ -469,7 +457,7 @@ namespace TechstoreBackend.Controllers
                     OrderDate = order.OrderDate,
                     Status = order.Status,
                     TotalAmount = order.TotalAmount,
-                    ShippingAddress = order.User?.Address ?? string.Empty,
+                    ShippingAddress = order.ShippingAddress,
                     PaymentStatus = order.PaymentStatus,
                     PaymentMethod = order.PaymentMethod,
                     Items = itemDtos
@@ -601,7 +589,8 @@ namespace TechstoreBackend.Controllers
                     Status = "pending",
                     TotalAmount = totalAmount,
                     PaymentStatus = "unpaid",
-                    PaymentMethod = orderDto.PaymentMethod
+                    PaymentMethod = orderDto.PaymentMethod,
+                    ShippingAddress = orderDto.ShippingAddress // Lưu địa chỉ giao hàng
                 };
 
                 _context.OrderTables.Add(order);
@@ -930,4 +919,4 @@ namespace TechstoreBackend.Controllers
         public string PaymentStatus { get; set; } = string.Empty;
     }
 }
-}
+ 
