@@ -390,7 +390,7 @@ namespace TechstoreBackend.Controllers
         }
 
         // GET: api/Customer/me - Lấy thông tin cá nhân của khách hàng đăng nhập
-        [HttpGet("me")]
+        [HttpGet("{id}")]
         public async Task<IActionResult> GetMyInfo()
         {
             try
@@ -454,7 +454,7 @@ namespace TechstoreBackend.Controllers
         }
 
         // PUT: api/Customer/me - Cập nhật thông tin cá nhân của khách hàng đăng nhập
-        [HttpPut("me")]
+        [HttpPut("{id}")]
         public async Task<IActionResult> UpdateMyInfo([FromBody] CustomerUpdateDto updateDto)
         {
             try
