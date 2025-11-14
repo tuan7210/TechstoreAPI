@@ -46,9 +46,9 @@ namespace TechstoreBackend.Controllers
                         u.CreatedAt,
                         u.Status, // Thêm trường trạng thái tài khoản
                         OrderCount = _context.OrderTables.Count(o => o.UserId == u.UserId),
-                        TotalSpent = _context.OrderTables
-                            .Where(o => o.UserId == u.UserId && o.PaymentStatus == "paid")
-                            .Sum(o => o.TotalAmount)
+                        TotalSpent = (_context.OrderTables
+                            .Where(o => o.UserId == u.UserId && o.PaymentStatus == "paid" && o.Status != "canceled")
+                            .Sum(o => (decimal?)o.TotalAmount)) ?? 0
                     })
                     .ToListAsync();
 
@@ -143,9 +143,9 @@ namespace TechstoreBackend.Controllers
 
 
                 var orderCount = _context.OrderTables.Count(o => o.UserId == customer.UserId);
-                var totalSpent = _context.OrderTables
-                    .Where(o => o.UserId == customer.UserId && o.PaymentStatus == "paid")
-                    .Sum(o => o.TotalAmount);
+                var totalSpent = (_context.OrderTables
+                    .Where(o => o.UserId == customer.UserId && o.PaymentStatus == "paid" && o.Status != "canceled")
+                    .Sum(o => (decimal?)o.TotalAmount)) ?? 0;
                 var recentOrders = _context.OrderTables
                     .Where(o => o.UserId == customer.UserId)
                     .OrderByDescending(o => o.OrderDate)
@@ -358,9 +358,9 @@ namespace TechstoreBackend.Controllers
                         u.Address,
                         u.CreatedAt,
                         OrderCount = _context.OrderTables.Count(o => o.UserId == u.UserId),
-                        TotalSpent = _context.OrderTables
-                            .Where(o => o.UserId == u.UserId && o.PaymentStatus == "paid")
-                            .Sum(o => o.TotalAmount)
+                        TotalSpent = (_context.OrderTables
+                            .Where(o => o.UserId == u.UserId && o.PaymentStatus == "paid" && o.Status != "canceled")
+                            .Sum(o => (decimal?)o.TotalAmount)) ?? 0
                     })
                     .ToListAsync();
 
@@ -389,8 +389,8 @@ namespace TechstoreBackend.Controllers
             }
         }
 
-        // GET: api/Customer/me - Lấy thông tin cá nhân của khách hàng đăng nhập
-        [HttpGet("{id}")]
+    // GET: api/Customer/me - Lấy thông tin cá nhân của khách hàng đăng nhập
+    [HttpGet("me")]
         public async Task<IActionResult> GetMyInfo()
         {
             try
@@ -410,9 +410,9 @@ namespace TechstoreBackend.Controllers
                         u.UpdatedAt,
                         u.Status,
                         OrderCount = _context.OrderTables.Count(o => o.UserId == u.UserId),
-                        TotalSpent = _context.OrderTables
-                            .Where(o => o.UserId == u.UserId && o.PaymentStatus == "paid")
-                            .Sum(o => o.TotalAmount),
+                        TotalSpent = (_context.OrderTables
+                            .Where(o => o.UserId == u.UserId && o.PaymentStatus == "paid" && o.Status != "canceled")
+                            .Sum(o => (decimal?)o.TotalAmount)) ?? 0,
                         RecentOrders = _context.OrderTables
                             .Where(o => o.UserId == u.UserId)
                             .OrderByDescending(o => o.OrderDate)
@@ -453,8 +453,8 @@ namespace TechstoreBackend.Controllers
             }
         }
 
-        // PUT: api/Customer/me - Cập nhật thông tin cá nhân của khách hàng đăng nhập
-        [HttpPut("{id}")]
+    // PUT: api/Customer/me - Cập nhật thông tin cá nhân của khách hàng đăng nhập
+    [HttpPut("me")]
         public async Task<IActionResult> UpdateMyInfo([FromBody] CustomerUpdateDto updateDto)
         {
             try
@@ -640,9 +640,9 @@ namespace TechstoreBackend.Controllers
                         u.UserId,
                         u.Name,
                         u.Email,
-                        TotalSpent = _context.OrderTables
-                            .Where(o => o.UserId == u.UserId && o.PaymentStatus == "paid")
-                            .Sum(o => o.TotalAmount),
+                        TotalSpent = (_context.OrderTables
+                            .Where(o => o.UserId == u.UserId && o.PaymentStatus == "paid" && o.Status != "canceled")
+                            .Sum(o => (decimal?)o.TotalAmount)) ?? 0,
                         OrderCount = _context.OrderTables.Count(o => o.UserId == u.UserId)
                     })
                     .Where(c => c.TotalSpent > 0)

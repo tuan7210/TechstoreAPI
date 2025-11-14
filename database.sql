@@ -21,19 +21,26 @@ CREATE TABLE Category (
 
 CREATE TABLE Product (
     product_id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255),
+    name VARCHAR(255) NOT NULL, -- Thêm NOT NULL để đảm bảo tên sản phẩm luôn có
     description TEXT,
-    price DECIMAL(10,2),
+    price DECIMAL(10,2) NOT NULL, -- Thêm NOT NULL
     original_price DECIMAL(10,2),
     brand VARCHAR(255),
-    stock_quantity INT,
-    category_id INT,
+    stock_quantity INT DEFAULT 0, -- Set DEFAULT
+    category_id INT NOT NULL, -- Thêm NOT NULL
     image_url VARCHAR(255),
     specifications JSON,
     rating DECIMAL(2,1) DEFAULT 0.0,
     review_count INT DEFAULT 0,
     is_new BOOLEAN DEFAULT FALSE,
     is_best_seller BOOLEAN DEFAULT FALSE,
+    
+    -- CỘT BỔ SUNG CHO CHATBOT AI
+    use_case TEXT,             -- Mô tả ngữ cảnh sử dụng (Cho ai? Làm gì?)
+    usp TEXT,                  -- Điểm bán hàng độc đáo (Unique Selling Points)
+    warranty_period VARCHAR(50), -- Thời gian bảo hành (Ví dụ: '12 tháng')
+    return_policy_days INT,    -- Số ngày đổi trả (Ví dụ: 7)
+    
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (category_id) REFERENCES Category(category_id)
