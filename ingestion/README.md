@@ -48,3 +48,29 @@ $env:ENABLE_EMBED="true"
 python ingestion/extract_products.py
 ```
 This will create or reuse a collection under `ingestion/chroma` and upsert chunked documents with metadata.
+
+## Start semantic search service (microservice)
+This tiny FastAPI service queries the persisted Chroma collection so the .NET backend can retrieve top‑k results semantically.
+
+### Env vars
+- `CHROMA_PATH` (default: ingestion/chroma)
+- `COLLECTION_NAME` (default: products)
+- `EMBED_MODEL` (default: sentence-transformers/all-MiniLM-L6-v2)
+- `OPENAI_API_KEY` (optional; fallback for embeddings if ST not available)
+- `OPENAI_EMBED_MODEL` (default: text-embedding-3-small)
+- `SERVICE_HOST` (default: 0.0.0.0)
+- `SERVICE_PORT` (default: 8000)
+
+### Run (Windows PowerShell)
+```powershell
+# ensure embeddings exist (ENABLE_EMBED=true run done at least once)
+# start the microservice
+python -m uvicorn ingestion.search_service:app --host 0.0.0.0 --port 8000
+```
+
+### cURL quick test (optional)
+```powershell
+curl -X POST http://localhost:8000/search -H "Content-Type: application/json" -d '{"query":"laptop gaming mỏng nhẹ","top_k":5}'
+```
+
+The .NET API should call this service at `http://localhost:8000/search` (configurable via `SEARCH_SERVICE_URL`).

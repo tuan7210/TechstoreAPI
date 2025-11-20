@@ -271,3 +271,260 @@ INSERT INTO Product (name, description, price, original_price, brand, stock_quan
  '{"type": "Wireless", "connection": "Bluetooth + USB Receiver", "dpi": "4000 DPI", "battery": "70 days", "features": "MagSpeed scroll, Multi-device"}',
  4.4, 156, FALSE, FALSE);
 
+-- ALTER TABLE Product ADD COLUMN use_case TEXT, ADD COLUMN usp TEXT, ADD COLUMN warranty_period VARCHAR(50), ADD COLUMN return_policy_days INT;
+
+-- ====================================================
+-- 1. Điện thoại
+-- ====================================================
+
+UPDATE Product
+SET
+    use_case = 'Lý tưởng cho người dùng hệ sinh thái Apple, cần hiệu năng ổn định, camera chất lượng cao và thiết kế bền bỉ. Phù hợp cho công việc văn phòng và giải trí cơ bản.',
+    usp = 'Chip A17 Bionic mạnh mẽ, Camera 48MP Pro, Cổng USB-C tiện lợi.',
+    warranty_period = '12 tháng chính hãng',
+    return_policy_days = 14
+WHERE name = 'iPhone 15 128GB';
+
+UPDATE Product
+SET
+    use_case = 'Dành cho người dùng Android cao cấp, yêu thích màn hình Dynamic AMOLED và các tính năng AI mới nhất của Samsung. Phù hợp cho đa nhiệm và sáng tạo nội dung.',
+    usp = 'Tích hợp Galaxy AI (Phiên dịch trực tiếp), Màn hình Dynamic AMOLED 2X, Chip Exynos 2400 hiệu năng cao.',
+    warranty_period = '12 tháng chính hãng',
+    return_policy_days = 14
+WHERE name = 'Samsung Galaxy S24';
+
+UPDATE Product
+SET
+    use_case = 'Lựa chọn tầm trung cho sinh viên hoặc người dùng phổ thông, tập trung vào thời lượng pin dài, sạc nhanh và camera độ phân giải cao.',
+    usp = 'Camera chính 108MP, Pin 5000mAh, Màn hình AMOLED 120Hz mượt mà.',
+    warranty_period = '18 tháng chính hãng',
+    return_policy_days = 7
+WHERE name = 'Xiaomi Redmi Note 13';
+
+-- ====================================================
+-- 2. Laptop
+-- ====================================================
+
+UPDATE Product
+SET
+    use_case = 'Phù hợp cho sinh viên, dân văn phòng, và người sáng tạo nội dung cơ bản. Cần máy tính mỏng nhẹ, pin cực lâu và xử lý tác vụ yên tĩnh.',
+    usp = 'Chip Apple M3 hiệu năng cao, Thiết kế không quạt (yên tĩnh), Thời lượng pin lên đến 18 giờ.',
+    warranty_period = '12 tháng chính hãng',
+    return_policy_days = 14
+WHERE name = 'MacBook Air M3 2025';
+
+UPDATE Product
+SET
+    use_case = 'Dành cho doanh nhân và các chuyên gia cần một chiếc laptop Windows mỏng nhẹ, thiết kế cao cấp và hiệu suất mạnh mẽ cho công việc văn phòng chuyên sâu.',
+    usp = 'Thiết kế InfinityEdge (viền siêu mỏng), Chất liệu nhôm nguyên khối, Hiệu năng Intel Core i7 mạnh mẽ.',
+    warranty_period = '12 tháng chính hãng',
+    return_policy_days = 7
+WHERE name = 'Dell XPS 13';
+
+UPDATE Product
+SET
+    use_case = 'Laptop gaming di động, dành cho game thủ và các nhà thiết kế/editor video cần card đồ họa mạnh mẽ trong một thân hình nhỏ gọn.',
+    usp = 'Card đồ họa RTX 4070, CPU AMD Ryzen 9 hiệu suất cao, Màn hình 14 inch QHD 165Hz.',
+    warranty_period = '24 tháng chính hãng',
+    return_policy_days = 7
+WHERE name = 'ASUS ROG Zephyrus G14';
+
+-- ====================================================
+-- 3. Phụ kiện
+-- ====================================================
+
+UPDATE Product
+SET
+    use_case = 'Lý tưởng cho người dùng Apple muốn trải nghiệm âm thanh chất lượng cao, chống ồn chủ động hiệu quả, và tích hợp sâu với các thiết bị iOS/macOS.',
+    usp = 'Chống ồn chủ động (ANC) hàng đầu, Chế độ xuyên âm (Transparency Mode), Spatial Audio.',
+    warranty_period = '12 tháng chính hãng',
+    return_policy_days = 14
+WHERE name = 'Tai nghe AirPods Pro 2';
+
+UPDATE Product
+SET
+    use_case = 'Củ sạc đa năng, phù hợp cho người thường xuyên di chuyển cần sạc cả laptop và điện thoại một cách nhanh chóng chỉ với một thiết bị.',
+    usp = 'Công suất 65W sạc laptop, 3 cổng (USB-C và USB-A), Công nghệ PowerIQ 3.0 sạc nhanh và an toàn.',
+    warranty_period = '18 tháng chính hãng',
+    return_policy_days = 7
+WHERE name = 'Sạc nhanh Anker 65W';
+
+UPDATE Product
+SET
+    use_case = 'Chuột công thái học dành cho lập trình viên, designer, và người làm văn phòng cần độ chính xác cao và làm việc liên tục trong thời gian dài.',
+    usp = 'Thiết kế công thái học (Ergonomic), Cuộn MagSpeed siêu nhanh, Kết nối Multi-device.',
+    warranty_period = '12 tháng chính hãng',
+    return_policy_days = 7
+WHERE name = 'Chuột Logitech MX Master 3';
+INSERT INTO Product (
+    name, description, price, original_price, brand, stock_quantity, category_id, image_url, specifications, rating, review_count, is_new, is_best_seller, 
+    use_case, usp, warranty_period, return_policy_days
+) 
+VALUES 
+-- ====================================================
+-- Danh mục 1: Điện thoại (Thêm 7 sản phẩm mới -> Tổng 10)
+-- ====================================================
+('iPhone 15 Pro Max 256GB', 'Siêu phẩm iPhone 15 Pro Max, khung Titan, camera 48MP', 32000000, 34000000, 'Apple', 30, 1, '/images/iphone15-pro-max.jpg', 
+    '{"screen": "6.7 inch Super Retina XDR ProMotion 120Hz", "chip": "A17 Pro", "ram": "8GB", "storage": "256GB", "camera": "48MP+12MP+12MP", "battery": "4422mAh"}', 
+    4.8, 210, TRUE, TRUE, 
+    'Phù hợp người dùng chuyên nghiệp, quay phim 4K, cần hiệu năng cao nhất.', 'Chip A17 Pro, Khung Titan, Camera Tele 5x.', '12 tháng chính hãng', 14),
+
+('Samsung Galaxy Z Flip 5 256GB', 'Điện thoại gập thời trang, màn hình Flex Window lớn', 19000000, 22000000, 'Samsung', 25, 1, '/images/galaxy-zflip5.jpg', 
+    '{"screen": "6.7 inch Dynamic AMOLED 2X", "chip": "Snapdragon 8 Gen 2 for Galaxy", "ram": "8GB", "storage": "256GB", "camera": "12MP+12MP", "battery": "3700mAh"}', 
+    4.5, 120, TRUE, FALSE, 
+    'Thời trang, người dùng yêu thích sự nhỏ gọn, chụp ảnh selfie linh hoạt.', 'Màn hình ngoài lớn (Flex Window), Gập mở nhỏ gọn, Camera FlexCam.', '12 tháng chính hãng', 14),
+
+('Google Pixel 8 128GB', 'Thuần Android, tích hợp AI sâu từ Google, camera chân thực.', 15000000, 17000000, 'Google', 20, 1, '/images/pixel-8.jpg', 
+    '{"screen": "6.2 inch OLED", "chip": "Google Tensor G3", "ram": "8GB", "storage": "128GB", "camera": "50MP+12MP", "battery": "4575mAh"}', 
+    4.7, 90, TRUE, FALSE, 
+    'Thuần Android, người thích trải nghiệm AI tích hợp sâu từ Google và chụp ảnh chân thực.', 'Thuần Android, Camera AI tốt nhất phân khúc, Tính năng Magic Eraser.', '12 tháng chính hãng', 7),
+
+('OPPO Reno 11 5G 256GB', 'Thiết kế đẹp, camera chụp chân dung, sạc siêu nhanh.', 10000000, 11500000, 'OPPO', 50, 1, '/images/oppo-reno11.jpg', 
+    '{"screen": "6.7 inch AMOLED 120Hz", "chip": "MediaTek Dimensity 7050", "ram": "8GB", "storage": "256GB", "camera": "50MP+8MP+32MP", "battery": "4800mAh"}', 
+    4.3, 80, TRUE, TRUE, 
+    'Nhu cầu tầm trung, thích thiết kế đẹp, camera chụp chân dung và sạc siêu nhanh.', 'Thiết kế mỏng nhẹ, Camera chân dung 32MP, Sạc nhanh 67W.', '12 tháng chính hãng', 7),
+
+('Realme C55 64GB', 'Ngân sách thấp, pin trâu và màn hình lớn.', 4000000, 4500000, 'Realme', 70, 1, '/images/realme-c55.jpg', 
+    '{"screen": "6.72 inch IPS LCD 90Hz", "chip": "MediaTek Helio G88", "ram": "6GB", "storage": "64GB", "camera": "64MP", "battery": "5000mAh"}', 
+    4.0, 150, FALSE, TRUE, 
+    'Học sinh, sinh viên, ngân sách thấp, cần pin trâu và màn hình lớn.', 'Pin 5000mAh, Màn hình 90Hz, Thiết kế Mini Capsule.', '12 tháng chính hãng', 7),
+
+('Samsung Galaxy A54 5G', 'Điện thoại tầm trung, kháng nước IP67, màn hình Super AMOLED.', 8500000, 9500000, 'Samsung', 45, 1, '/images/galaxy-a54.jpg', 
+    '{"screen": "6.4 inch Super AMOLED 120Hz", "chip": "Exynos 1380", "ram": "8GB", "storage": "128GB", "camera": "50MP+12MP+5MP", "battery": "5000mAh"}', 
+    4.4, 110, FALSE, FALSE, 
+    'Người dùng tầm trung cần điện thoại bền bỉ, kháng nước và màn hình hiển thị đẹp.', 'Kháng nước IP67, Màn hình Super AMOLED, Pin 2 ngày.', '12 tháng chính hãng', 14),
+
+('Xiaomi 13T Pro 512GB', 'Flagship Killer, hiệu năng mạnh, camera Leica chuyên nghiệp.', 16000000, 18000000, 'Xiaomi', 25, 1, '/images/xiaomi-13t-pro.jpg', 
+    '{"screen": "6.67 inch AMOLED 144Hz", "chip": "Dimensity 9200+", "ram": "12GB", "storage": "512GB", "camera": "50MP+12MP+50MP", "battery": "5000mAh"}', 
+    4.6, 70, TRUE, TRUE, 
+    'Game thủ và nhiếp ảnh gia cần hiệu năng cao nhất và chất lượng ảnh Leica ở phân khúc cận cao cấp.', 'Sạc siêu nhanh 120W (đầy pin 19 phút), Camera Leica, Màn hình 144Hz.', '24 tháng chính hãng', 7),
+
+
+-- ====================================================
+-- Danh mục 2: Laptop (Thêm 7 sản phẩm mới -> Tổng 10)
+-- ====================================================
+('MacBook Pro M3 Pro 14 inch', 'Laptop cho chuyên gia sáng tạo, hiệu năng cực mạnh.', 45000000, 48000000, 'Apple', 15, 2, '/images/macbook-pro-m3pro.jpg', 
+    '{"screen": "14.2 inch Liquid Retina XDR", "chip": "Apple M3 Pro", "ram": "18GB", "storage": "512GB SSD", "graphics": "14-core GPU", "weight": "1.6kg"}', 
+    4.9, 80, TRUE, TRUE, 
+    'Dành cho Editor video, thiết kế đồ họa 3D, lập trình viên chuyên nghiệp.', 'Chip M3 Pro hiệu năng đột phá, Màn hình Liquid Retina XDR, Thời lượng pin 22 giờ.', '12 tháng chính hãng', 14),
+
+('Lenovo Legion Pro 5 Gen 8', 'Laptop gaming hiệu năng khủng, màn hình tốc độ cao.', 38000000, 41000000, 'Lenovo', 18, 2, '/images/lenovo-legion-5.jpg', 
+    '{"screen": "16 inch QHD 240Hz", "cpu": "Intel Core i7-13700HX", "ram": "32GB DDR5", "storage": "1TB SSD", "graphics": "NVIDIA RTX 4070 8GB", "weight": "2.5kg"}', 
+    4.7, 50, FALSE, TRUE, 
+    'Game thủ hard-core, cần hiệu năng gaming và tản nhiệt mạnh mẽ.', 'Card đồ họa RTX 4070, Màn hình 240Hz, Tản nhiệt hiệu quả.', '24 tháng chính hãng', 7),
+
+('HP Spectre x360 14', 'Laptop 2-trong-1 cao cấp, thiết kế xoay gập linh hoạt.', 36000000, 39000000, 'HP', 12, 2, '/images/hp-spectre-x360.jpg', 
+    '{"screen": "13.5 inch 3K2K OLED Touch", "cpu": "Intel Core i7-1355U", "ram": "16GB LPDDR5", "storage": "1TB SSD", "graphics": "Intel Iris Xe", "weight": "1.36kg"}', 
+    4.6, 40, TRUE, FALSE, 
+    'Doanh nhân, người thường xuyên trình bày, cần máy 2-trong-1 cao cấp, cảm ứng.', 'Thiết kế xoay 360 độ, Màn hình OLED, Bút stylus kèm theo.', '12 tháng chính hãng', 7),
+
+('Microsoft Surface Laptop 5', 'Laptop sang trọng, tối ưu cho Microsoft Office.', 28000000, 30000000, 'Microsoft', 20, 2, '/images/surface-laptop-5.jpg', 
+    '{"screen": "13.5 inch PixelSense Touch", "cpu": "Intel Core i5-1235U", "ram": "8GB LPDDR5", "storage": "512GB SSD", "graphics": "Intel Iris Xe", "weight": "1.27kg"}', 
+    4.5, 35, FALSE, FALSE, 
+    'Người dùng cần trải nghiệm Windows mượt mà, thiết kế sang trọng, tối ưu cho Microsoft Office.', 'Màn hình cảm ứng PixelSense, Vật liệu Alcantara, Trải nghiệm Windows thuần túy.', '12 tháng chính hãng', 14),
+
+('ASUS Zenbook 14 OLED UX3405', 'Mỏng nhẹ, màn hình OLED đẹp, pin trâu.', 22000000, 24000000, 'ASUS', 28, 2, '/images/asus-zenbook-14.jpg', 
+    '{"screen": "14 inch 3K OLED 120Hz", "cpu": "Intel Core Ultra 7", "ram": "16GB LPDDR5", "storage": "512GB SSD", "graphics": "Intel Arc", "weight": "1.2kg"}', 
+    4.7, 48, TRUE, TRUE, 
+    'Văn phòng, sinh viên, cần máy mỏng nhẹ, pin tốt, màn hình đẹp với mức giá hợp lý.', 'Màn hình OLED 3K 120Hz, Siêu mỏng nhẹ (1.2kg), Pin dài.', '24 tháng chính hãng', 7),
+
+('Dell Inspiron 15', 'Laptop phổ thông, màn hình lớn 15.6 inch.', 13000000, 15000000, 'Dell', 40, 2, '/images/dell-inspiron-15.jpg', 
+    '{"screen": "15.6 inch Full HD", "cpu": "Intel Core i5-1235U", "ram": "8GB DDR4", "storage": "256GB SSD", "graphics": "Intel Iris Xe", "weight": "1.8kg"}', 
+    4.2, 60, FALSE, FALSE, 
+    'Sử dụng tại nhà, học tập online, nhu cầu cơ bản với màn hình lớn.', 'Màn hình lớn 15.6 inch, Bàn phím số đầy đủ, Giá thành hợp lý.', '12 tháng chính hãng', 7),
+
+('Acer Swift Go 14 OLED', 'Laptop tầm trung có màn hình OLED, mỏng nhẹ.', 18000000, 20000000, 'Acer', 35, 2, '/images/acer-swift-go-14.jpg', 
+    '{"screen": "14 inch 2.8K OLED", "cpu": "Intel Core i5-13500H", "ram": "16GB LPDDR5", "storage": "512GB SSD", "graphics": "Intel Iris Xe", "weight": "1.3kg"}', 
+    4.4, 30, TRUE, FALSE, 
+    'Sinh viên ngành đồ họa cơ bản và người làm văn phòng cần màu sắc chính xác, chất lượng hiển thị cao.', 'Màn hình OLED 2.8K, Thiết kế vỏ nhôm, Webcam QHD.', '24 tháng chính hãng', 7),
+
+-- ====================================================
+-- Danh mục 3: Phụ kiện (Thêm 7 sản phẩm mới -> Tổng 10)
+-- ====================================================
+('Bàn phím Logitech MX Keys S', 'Bàn phím không dây cao cấp, gõ êm, đèn nền thông minh.', 2800000, 3200000, 'Logitech', 40, 3, '/images/logitech-mxkeys-s.jpg', 
+    '{"type": "Wireless", "connection": "Bluetooth + Bolt Receiver", "battery": "10 ngày", "features": "Perfect Stroke Keys, Sạc USB-C, Smart Illumination"}', 
+    4.8, 80, TRUE, TRUE, 
+    'Lập trình viên, người gõ văn bản nhiều, cần trải nghiệm gõ phím yên tĩnh, chính xác.', 'Công nghệ gõ Perfect Stroke, Nút tắt tiếng (Mute), Kết nối 3 thiết bị.', '12 tháng chính hãng', 7),
+
+('Ổ cứng SSD Samsung T7 1TB', 'Ổ cứng di động tốc độ cao, bền bỉ, bảo mật vân tay.', 3500000, 4000000, 'Samsung', 50, 3, '/images/samsung-ssd-t7.jpg', 
+    '{"capacity": "1TB", "connection": "USB 3.2 Gen 2", "speed": "1050MB/s", "features": "Chống sốc, Bảo mật vân tay"}', 
+    4.9, 150, FALSE, TRUE, 
+    'Chuyên gia cần lưu trữ dữ liệu lớn, tốc độ truyền tải cực nhanh cho video 4K.', 'Tốc độ đọc/ghi 1050MB/s, Bảo mật bằng vân tay, Chống sốc.', '36 tháng chính hãng', 30),
+
+('Giá đỡ laptop Nillkin Pro', 'Giá đỡ công thái học, chất liệu hợp kim nhôm, tản nhiệt tốt.', 550000, 700000, 'Nillkin', 80, 3, '/images/nillkin-laptop-stand.jpg', 
+    '{"material": "Hợp kim nhôm", "adjustable_levels": "7 cấp độ", "compatible_size": "11-17 inch", "weight": "250g"}', 
+    4.6, 200, FALSE, FALSE, 
+    'Người làm việc cố định, cần cải thiện tư thế ngồi, tản nhiệt cho laptop.', 'Thiết kế công thái học (Ergonomic), Chất liệu hợp kim nhôm, Gấp gọn di động.', '6 tháng chính hãng', 7),
+
+('Cáp sạc Innostyle C-L 2m', 'Cáp sạc Lightning bọc dù chống đứt, hỗ trợ sạc nhanh.', 300000, 400000, 'Innostyle', 120, 3, '/images/innostyle-cable.jpg', 
+    '{"type": "USB-C to Lightning", "length": "2m", "power": "Hỗ trợ 27W", "features": "MFi Certified, Bọc dù Kevlar"}', 
+    4.7, 90, FALSE, FALSE, 
+    'Người cần sạc nhanh iPhone/iPad và muốn cáp sạc có độ bền cao, chống đứt gãy.', 'Chứng nhận MFi của Apple, Bọc dù Kevlar chống đứt, Hỗ trợ sạc nhanh PD.', '12 tháng chính hãng', 7),
+
+('Webcam Logitech C920S Pro', 'Webcam Full HD chuyên nghiệp, tích hợp màn trập riêng tư.', 1500000, 1800000, 'Logitech', 35, 3, '/images/logitech-c920s.jpg', 
+    '{"resolution": "1080p/30fps", "focus": "Tự động", "mic": "Mic kép Stereo", "features": "Privacy Shutter"}', 
+    4.5, 60, FALSE, FALSE, 
+    'Họp online, livestream cơ bản, cần hình ảnh Full HD rõ nét và bảo mật riêng tư.', 'Độ phân giải Full HD 1080p, Tích hợp màn trập riêng tư (Privacy Shutter), Mic kép.', '12 tháng chính hãng', 7),
+
+('Pin dự phòng Anker PowerCore III Sense 10000mAh', 'Pin dự phòng mỏng nhẹ, hỗ trợ sạc nhanh PD.', 750000, 900000, 'Anker', 150, 3, '/images/anker-powercore-10k.jpg', 
+    '{"capacity": "10000mAh", "ports": "USB-C, USB-A", "tech": "Power Delivery (PD), PowerIQ", "weight": "200g"}', 
+    4.6, 250, FALSE, TRUE, 
+    'Người dùng thường xuyên ra ngoài, cần nguồn điện dự phòng mỏng nhẹ, hỗ trợ sạc nhanh cho điện thoại.', 'Hỗ trợ sạc nhanh PD 20W, Thiết kế mỏng, bề mặt vải.', '18 tháng chính hãng', 7),
+
+('Loa di động Sony SRS-XB13', 'Loa Bluetooth nhỏ gọn, chống nước, âm thanh Extra Bass.', 990000, 1200000, 'Sony', 60, 3, '/images/sony-srs-xb13.jpg', 
+    '{"type": "Bluetooth Speaker", "waterproof": "IP67", "battery": "16 giờ", "features": "Extra Bass, Tích hợp micro"}', 
+    4.4, 75, FALSE, FALSE, 
+    'Người yêu thích âm nhạc, cần loa di động nhỏ gọn, có thể mang đi biển/hồ bơi (chống nước).', 'Chống nước/bụi IP67, Công nghệ Extra Bass, Thời lượng pin 16 giờ.', '12 tháng chính hãng', 14),
+
+-- ====================================================
+-- Danh mục 4: Máy tính bảng (Thêm 10 sản phẩm mới -> Tổng 10)
+-- ====================================================
+('iPad Air M1 (256GB WiFi)', 'iPad Air với chip M1 mạnh mẽ, màn hình Liquid Retina.', 18000000, 20000000, 'Apple', 22, 4, '/images/ipad-air-m1.jpg', 
+    '{"screen": "10.9 inch Liquid Retina", "chip": "Apple M1", "ram": "8GB", "storage": "256GB", "features": "Hỗ trợ Apple Pencil 2", "weight": "461g"}', 
+    4.8, 85, TRUE, TRUE, 
+    'Học sinh, sinh viên, người dùng sáng tạo cần hiệu năng mạnh mẽ trong tầm giá phải chăng.', 'Chip M1 mạnh mẽ, Màn hình Liquid Retina, Hỗ trợ Apple Pencil 2.', '12 tháng chính hãng', 14),
+
+('Samsung Galaxy Tab S9 Ultra 512GB', 'Máy tính bảng màn hình lớn nhất, hiệu năng cao.', 30000000, 32000000, 'Samsung', 18, 4, '/images/galaxy-tab-s9-ultra.jpg', 
+    '{"screen": "14.6 inch Dynamic AMOLED 2X", "chip": "Snapdragon 8 Gen 2 for Galaxy", "ram": "12GB", "storage": "512GB", "features": "Kèm bút S Pen, IP68", "weight": "732g"}', 
+    4.9, 50, TRUE, FALSE, 
+    'Người dùng muốn thay thế laptop, cần màn hình lớn nhất, hiệu năng cao nhất trên Android.', 'Màn hình Dynamic AMOLED 14.6 inch, Kèm bút S Pen, Chống nước IP68.', '12 tháng chính hãng', 14),
+
+('Xiaomi Pad 5 128GB', 'Máy tính bảng tầm trung, màn hình 120Hz, giải trí tốt.', 8500000, 9500000, 'Xiaomi', 40, 4, '/images/xiaomi-pad-5.jpg', 
+    '{"screen": "11 inch IPS 120Hz", "chip": "Snapdragon 860", "ram": "6GB", "storage": "128GB", "features": "4 loa Dolby Atmos", "battery": "8720mAh"}', 
+    4.4, 130, FALSE, TRUE, 
+    'Giải trí, xem phim, chơi game, ngân sách tầm trung, cần màn hình 120Hz mượt mà.', 'Màn hình 120Hz, 4 loa Dolby Atmos, Chip Snapdragon 860.', '12 tháng chính hãng', 7),
+
+('Lenovo Tab P11 Pro Gen 2', 'Máy tính bảng làm việc, màn hình OLED 120Hz cao cấp.', 14000000, 16000000, 'Lenovo', 15, 4, '/images/lenovo-tab-p11-pro.jpg', 
+    '{"screen": "11.2 inch OLED 120Hz", "chip": "MediaTek Kompanio 1300T", "ram": "8GB", "storage": "256GB", "features": "Hỗ trợ chế độ Desktop", "battery": "8000mAh"}', 
+    4.6, 45, TRUE, FALSE, 
+    'Người dùng cần máy tính bảng làm việc, màn hình OLED đẹp, có thể dùng làm màn hình thứ hai cho PC.', 'Màn hình OLED 120Hz, Hỗ trợ chế độ Desktop, Hiệu năng tốt.', '12 tháng chính hãng', 7),
+
+('Huawei MatePad 11', 'Máy tính bảng học tập, hệ sinh thái HarmonyOS.', 10000000, 11000000, 'Huawei', 30, 4, '/images/huawei-matepad-11.jpg', 
+    '{"screen": "10.95 inch IPS 120Hz", "chip": "Snapdragon 865", "ram": "6GB", "storage": "128GB", "features": "Hỗ trợ M-Pencil", "battery": "7250mAh"}', 
+    4.3, 50, FALSE, FALSE, 
+    'Học sinh, sinh viên cần máy tính bảng để học tập, ghi chú, và hệ sinh thái HarmonyOS.', 'Màn hình 120Hz, Hỗ trợ bút Huawei M-Pencil, Tối ưu cho học tập.', '12 tháng chính hãng', 7),
+
+('Samsung Galaxy Tab A9+ (Plus)', 'Máy tính bảng phổ thông, giải trí cơ bản.', 6000000, 7000000, 'Samsung', 55, 4, '/images/galaxy-tab-a9-plus.jpg', 
+    '{"screen": "11 inch LCD 90Hz", "chip": "Snapdragon 695", "ram": "4GB", "storage": "64GB", "features": "Loa Quad Speakers", "battery": "7040mAh"}', 
+    4.2, 70, FALSE, TRUE, 
+    'Nhu cầu giải trí cơ bản, xem phim, lướt web, học tập online với mức giá thấp.', 'Màn hình 11 inch 90Hz, Loa Quad Speakers, Thiết kế kim loại.', '12 tháng chính hãng', 7),
+
+('iPad 10.9 inch (Gen 10)', 'Máy tính bảng cơ bản của Apple, chip A14 Bionic.', 12500000, 14000000, 'Apple', 28, 4, '/images/ipad-gen10.jpg', 
+    '{"screen": "10.9 inch Liquid Retina", "chip": "A14 Bionic", "ram": "4GB", "storage": "64GB", "features": "Hỗ trợ Magic Keyboard Folio", "weight": "477g"}', 
+    4.7, 60, FALSE, FALSE, 
+    'Người dùng Apple cần máy tính bảng để học tập, giải trí và không cần hiệu năng M-series quá mức.', 'Chip A14 Bionic ổn định, Thiết kế mới, Cổng USB-C.', '12 tháng chính hãng', 14),
+
+('Xiaomi Pad 6S Pro', 'Máy tính bảng hiệu năng cực mạnh, màn hình 144Hz.', 15000000, 17000000, 'Xiaomi', 20, 4, '/images/xiaomi-pad-6s-pro.jpg', 
+    '{"screen": "12.4 inch 3K 144Hz", "chip": "Snapdragon 8 Gen 2", "ram": "12GB", "storage": "512GB", "features": "6 loa, Sạc 120W", "battery": "10000mAh"}', 
+    4.7, 30, TRUE, TRUE, 
+    'Game thủ và người dùng chuyên nghiệp cần máy tính bảng có hiệu năng mạnh tương đương laptop và sạc siêu nhanh.', 'Chip Snapdragon 8 Gen 2 mạnh mẽ, Màn hình 144Hz, Sạc nhanh 120W.', '18 tháng chính hãng', 7),
+
+('Lenovo Tab M10 Plus (Gen 3)', 'Máy tính bảng giá rẻ, màn hình 2K.', 5500000, 6500000, 'Lenovo', 40, 4, '/images/lenovo-tab-m10.jpg', 
+    '{"screen": "10.6 inch 2K LCD", "chip": "MediaTek Helio G80", "ram": "4GB", "storage": "128GB", "features": "Loa Quad Speakers", "battery": "7700mAh"}', 
+    4.0, 90, FALSE, FALSE, 
+    'Giải trí cơ bản, xem video, máy tính bảng cho trẻ em với màn hình 2K đẹp trong phân khúc giá rẻ.', 'Màn hình 2K, Giá thành rất phải chăng, Pin 7700mAh.', '12 tháng chính hãng', 7),
+
+('Samsung Galaxy Tab S7 FE', 'Máy tính bảng màn hình lớn 12.4 inch, pin trâu.', 9000000, 11000000, 'Samsung', 25, 4, '/images/galaxy-tab-s7-fe.jpg', 
+    '{"screen": "12.4 inch TFT LCD", "chip": "Snapdragon 778G", "ram": "6GB", "storage": "128GB", "features": "Kèm bút S Pen", "battery": "10090mAh"}', 
+    4.5, 55, FALSE, FALSE, 
+    'Sinh viên, giáo viên cần màn hình lớn để ghi chú, vẽ và học tập trong thời gian dài.', 'Màn hình lớn 12.4 inch, Pin 10090mAh, Kèm bút S Pen.', '12 tháng chính hãng', 14);

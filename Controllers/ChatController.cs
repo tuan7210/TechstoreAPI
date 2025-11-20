@@ -37,48 +37,71 @@ namespace TechstoreBackend.Controllers
             }
 
             int topK = req.TopK <= 0 ? 5 : Math.Min(req.TopK, 10);
+            // Try semantic retrieval via Python microservice (Chroma)
+            var svcResults = await QuerySearchServiceAsync(req.Question, topK);
 
-            // RAG-lite retrieval: simple keyword search as fallback (no vector store from .NET)
-            var q = req.Question.Trim();
-            var terms = q.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                         .Select(t => t.ToLower()).Distinct().ToList();
-
-            // Prefilter in DB to limit result size
-            var pre = await _context.Products
-                .Select(p => new {
-                    p.ProductId, p.Name, p.Brand, p.Description, p.Price, p.ImageUrl,
-                    CategoryName = _context.Categorys.Where(c => c.CategoryId == p.CategoryId).Select(c => c.Name).FirstOrDefault()
-                })
-                .Take(300)
-                .ToListAsync();
-
-            // Score in memory (very simple proxy for semantic match)
-            var ranked = pre
-                .Select(p => new {
-                    p.ProductId,
-                    p.Name,
-                    p.Brand,
-                    p.Description,
-                    p.Price,
-                    p.ImageUrl,
-                    p.CategoryName,
-                    Score = Score(p.Name, p.Brand, p.Description, terms)
-                })
-                .OrderByDescending(x => x.Score)
-                .ThenBy(x => x.Price)
-                .Take(topK)
-                .ToList();
-
-            var productSnippets = ranked.Select(x => new ChatProductSnippetDto
+            List<ChatProductSnippetDto> productSnippets;
+            if (svcResults != null && svcResults.Count > 0)
             {
-                ProductId = x.ProductId,
-                Name = x.Name,
-                Brand = x.Brand,
-                Category = x.CategoryName,
-                Price = x.Price,
-                Description = x.Description,
-                ImageUrl = x.ImageUrl
-            }).ToList();
+                // Map from search microservice response (prefer metadata fields)
+                productSnippets = svcResults
+                    .GroupBy(r => r.ProductId ?? -1) // group chunks per product
+                    .Select(g => g.First()) // pick top chunk per product
+                    .Select(r => new ChatProductSnippetDto
+                    {
+                        ProductId = r.ProductId ?? 0,
+                        Name = r.Name ?? string.Empty,
+                        Brand = r.Brand ?? string.Empty,
+                        Category = r.CategoryName,
+                        Price = r.Price ?? 0,
+                        Description = !string.IsNullOrWhiteSpace(r.Document) ? r.Document : null,
+                        ImageUrl = r.ImageUrl
+                    })
+                    .Take(topK)
+                    .ToList();
+            }
+            else
+            {
+                // Fallback: simple keyword scoring on DB subset if service unavailable
+                var q = req.Question.Trim();
+                var terms = q.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                             .Select(t => t.ToLower()).Distinct().ToList();
+
+                var pre = await _context.Products
+                    .Select(p => new {
+                        p.ProductId, p.Name, p.Brand, p.Description, p.Price, p.ImageUrl,
+                        CategoryName = _context.Categorys.Where(c => c.CategoryId == p.CategoryId).Select(c => c.Name).FirstOrDefault()
+                    })
+                    .Take(300)
+                    .ToListAsync();
+
+                var ranked = pre
+                    .Select(p => new {
+                        p.ProductId,
+                        p.Name,
+                        p.Brand,
+                        p.Description,
+                        p.Price,
+                        p.ImageUrl,
+                        p.CategoryName,
+                        Score = Score(p.Name, p.Brand, p.Description, terms)
+                    })
+                    .OrderByDescending(x => x.Score)
+                    .ThenBy(x => x.Price)
+                    .Take(topK)
+                    .ToList();
+
+                productSnippets = ranked.Select(x => new ChatProductSnippetDto
+                {
+                    ProductId = x.ProductId,
+                    Name = x.Name,
+                    Brand = x.Brand,
+                    Category = x.CategoryName,
+                    Price = x.Price,
+                    Description = x.Description,
+                    ImageUrl = x.ImageUrl
+                }).ToList();
+            }
 
             var contextText = BuildContextText(productSnippets);
 
@@ -97,6 +120,47 @@ namespace TechstoreBackend.Controllers
                 Mode = mode
             };
             return Ok(new { success = true, message = "OK", data = resp });
+        }
+
+        private class SearchServiceResult
+        {
+            public string Id { get; set; } = string.Empty;
+            public int? ProductId { get; set; }
+            public int? ChunkIndex { get; set; }
+            public double? Score { get; set; }
+            public string? Name { get; set; }
+            public string? Brand { get; set; }
+            public string? CategoryName { get; set; }
+            public decimal? Price { get; set; }
+            public string? ImageUrl { get; set; }
+            public string? Document { get; set; }
+        }
+
+        private class SearchServiceResponse
+        {
+            public bool Success { get; set; }
+            public List<SearchServiceResult> Results { get; set; } = new();
+        }
+
+        private async Task<List<SearchServiceResult>> QuerySearchServiceAsync(string question, int topK)
+        {
+            try
+            {
+                var url = Environment.GetEnvironmentVariable("SEARCH_SERVICE_URL") ?? "http://localhost:8000";
+                using var http = new HttpClient();
+                var payload = new { query = question, top_k = topK };
+                var json = JsonSerializer.Serialize(payload, _jsonOptions);
+                using var contentJson = new StringContent(json, Encoding.UTF8, "application/json");
+                using var resp = await http.PostAsync($"{url.TrimEnd('/')}/search", contentJson);
+                if (!resp.IsSuccessStatusCode) return new List<SearchServiceResult>();
+                var body = await resp.Content.ReadAsStringAsync();
+                var parsed = JsonSerializer.Deserialize<SearchServiceResponse>(body, _jsonOptions);
+                return parsed != null && parsed.Success && parsed.Results != null ? parsed.Results : new List<SearchServiceResult>();
+            }
+            catch
+            {
+                return new List<SearchServiceResult>();
+            }
         }
 
         private static int Score(string? name, string? brand, string? desc, List<string> terms)
