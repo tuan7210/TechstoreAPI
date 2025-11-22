@@ -217,8 +217,8 @@ namespace TechstoreBackend.Controllers
                 http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
                 http.DefaultRequestHeaders.Add("OpenAI-Beta", "assistants=v2");
 
-                var systemPrompt = "Bạn là trợ lý bán hàng công nghệ, trả lời ngắn gọn, chính xác, bằng tiếng Việt. Chỉ sử dụng thông tin trong Context.";
-                var userPrompt = $"Câu hỏi: {question}\n\nContext:\n{context}\n\nYêu cầu: Tư vấn 3-5 sản phẩm phù hợp, nêu lý do ngắn gọn, dùng bullet và giá VNĐ.";
+                var systemPrompt = "Bạn là trợ lý bán hàng công nghệ, trả lời ngắn gọn, chính xác, bằng tiếng Việt. Chỉ sử dụng thông tin trong Context. Nếu Context không đủ thông tin, hãy trả lời: 'Xin lỗi, hiện tôi chưa có thông tin trong kho dữ liệu.'";
+                var userPrompt = $"Câu hỏi: {question}\n\nContext:\n{context}\n\nYêu cầu: Tư vấn 3-5 sản phẩm phù hợp, nêu lý do ngắn gọn, dùng bullet và giá VNĐ. Chỉ dựa trên Context.";
 
                 var payload = new
                 {

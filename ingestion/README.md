@@ -74,3 +74,12 @@ curl -X POST http://localhost:8000/search -H "Content-Type: application/json" -d
 ```
 
 The .NET API should call this service at `http://localhost:8000/search` (configurable via `SEARCH_SERVICE_URL`).
+
+## RAG‑only mode (no fine‑tuning)
+This project now uses Retrieval‑Augmented Generation only:
+
+- Extract products and (optionally) embed to Chroma.
+- Start the FastAPI search service.
+- The .NET backend composes a strict RAG prompt and calls a chat model/API.
+
+No fine‑tuning scripts or Q&A datasets are required anymore. If you previously created `ingestion/datasets/*` or used LoRA scripts, you can safely ignore them.
