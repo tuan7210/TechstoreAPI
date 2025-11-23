@@ -141,6 +141,62 @@ namespace TechstoreBackend.Controllers
             }
         }
 
+        [HttpPost("export-jsonl")]
+        public async Task<ActionResult<ApiResponse<object>>> ExportProductsJsonl()
+        {
+            try
+            {
+                var products = await _context.Products
+                    .Include(p => p.Category)
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                var lines = products.Select(p => new
+                {
+                    product_id = p.ProductId,
+                    name = p.Name,
+                    description = p.Description,
+                    brand = p.Brand,
+                    specifications = TryParseJson(p.Specifications),
+                    price = p.Price,
+                    original_price = p.OriginalPrice,
+                    stock_quantity = p.StockQuantity,
+                    category_id = p.CategoryId,
+                    category_name = p.Category != null ? p.Category.Name : string.Empty,
+                    image_url = p.ImageUrl,
+                    rating = p.Rating,
+                    review_count = p.ReviewCount,
+                    is_new = p.IsNew,
+                    is_best_seller = p.IsBestSeller,
+                    created_at = p.CreatedAt,
+                    updated_at = p.UpdatedAt
+                }).ToList();
+
+                var rootDir = Directory.GetCurrentDirectory();
+                var outDir = Path.Combine(rootDir, "ingestion", "output");
+                Directory.CreateDirectory(outDir);
+                var outPath = Path.Combine(outDir, "products.jsonl");
+
+                await using (var fs = new FileStream(outPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                await using (var sw = new StreamWriter(fs, System.Text.Encoding.UTF8))
+                {
+                    foreach (var item in lines)
+                    {
+                        var json = JsonSerializer.Serialize(item);
+                        await sw.WriteLineAsync(json);
+                    }
+                }
+
+                var result = new { count = lines.Count, path = outPath };
+                return Ok(ApiResponse<object>.SuccessResult(result, "Xuất JSONL thành công"));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ApiResponse<object>.ErrorResult(
+                    "Lỗi khi xuất JSONL", new List<string> { ex.Message }));
+            }
+        }
+
         [HttpGet("{id}")]
         public async Task<ActionResult<ApiResponse<ProductResponseDto>>> GetProduct(int id)
         {
@@ -508,6 +564,20 @@ namespace TechstoreBackend.Controllers
             catch
             {
                 return specifications; // Return as string if JSON parsing fails
+            }
+        }
+
+        // Helper for export: return parsed JSON or raw string
+        private object? TryParseJson(string? s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return null;
+            try
+            {
+                return JsonSerializer.Deserialize<object>(s);
+            }
+            catch
+            {
+                return s;
             }
         }
 

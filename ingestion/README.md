@@ -31,6 +31,32 @@ Small extractor to pull product data from MySQL and write JSONL for vectorizatio
 python -m pip install -r ingestion/requirements.txt
 ```
 
+## Thiết lập thông tin kết nối MySQL (khuyên dùng .env khi dev)
+Script `extract_products.py` sẽ tự động đọc file `.env` (nhờ `python-dotenv`). Bạn tạo file `ingestion/.env` với nội dung ví dụ:
+
+```
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=your_user
+DB_PASSWORD=your_password
+DB_NAME=tech_store
+ENABLE_EMBED=true
+CHROMA_PATH=ingestion/chroma
+COLLECTION_NAME=products
+EMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2
+```
+
+Sau đó chỉ cần chạy:
+```powershell
+python ingestion/extract_products.py
+```
+
+Bạn vẫn có thể override nhanh bằng biến môi trường tạm thời trong PowerShell:
+```powershell
+$env:ENABLE_EMBED="true"; $env:DB_USER="your_user"; $env:DB_PASSWORD="your_password"; python ingestion/extract_products.py
+```
+Nhưng cách dùng `.env` thuận tiện hơn, ít phải gõ lại và tránh lộ mật khẩu trong lịch sử terminal screenshot.
+
 ## Run (extract only)
 ```bash
 # Windows PowerShell example:
@@ -83,3 +109,10 @@ This project now uses Retrieval‑Augmented Generation only:
 - The .NET backend composes a strict RAG prompt and calls a chat model/API.
 
 No fine‑tuning scripts or Q&A datasets are required anymore. If you previously created `ingestion/datasets/*` or used LoRA scripts, you can safely ignore them.
+
+### Embed without database
+If you already have `ingestion/output/products.jsonl` and only need to build the Chroma vector store (no MySQL connection), run:
+```powershell
+python ingestion/embed_existing_products.py
+```
+Set env vars (optional): `PRODUCTS_PATH`, `CHROMA_PATH`, `COLLECTION_NAME`, `EMBED_MODEL`.
