@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using TechstoreBackend.Data;
 using TechstoreBackend.Models;
 using TechstoreBackend.Models.DTOs;
@@ -45,8 +46,8 @@ namespace TechstoreBackend.Controllers
             {
                 // Map from search microservice response (prefer metadata fields)
                 productSnippets = svcResults
-                    .GroupBy(r => r.ProductId ?? -1) // group chunks per product
-                    .Select(g => g.First()) // pick top chunk per product
+                    .GroupBy(r => r.ProductId ?? -1)
+                    .Select(g => g.First())
                     .Select(r => new ChatProductSnippetDto
                     {
                         ProductId = r.ProductId ?? 0,
@@ -55,7 +56,10 @@ namespace TechstoreBackend.Controllers
                         Category = r.CategoryName,
                         Price = r.Price ?? 0,
                         Description = !string.IsNullOrWhiteSpace(r.Document) ? r.Document : null,
-                        ImageUrl = r.ImageUrl
+                        ImageUrl = r.ImageUrl,
+                        UseCase = string.IsNullOrWhiteSpace(r.UseCase) ? null : r.UseCase,
+                        Usp = string.IsNullOrWhiteSpace(r.Usp) ? null : r.Usp,
+                        SpecificationsText = string.IsNullOrWhiteSpace(r.SpecText) ? null : r.SpecText
                     })
                     .Take(topK)
                     .ToList();
@@ -128,12 +132,16 @@ namespace TechstoreBackend.Controllers
             public int? ProductId { get; set; }
             public int? ChunkIndex { get; set; }
             public double? Score { get; set; }
+            public double? CrossScore { get; set; }
             public string? Name { get; set; }
             public string? Brand { get; set; }
             public string? CategoryName { get; set; }
             public decimal? Price { get; set; }
             public string? ImageUrl { get; set; }
             public string? Document { get; set; }
+            [JsonPropertyName("use_case")] public string? UseCase { get; set; }
+            [JsonPropertyName("usp")] public string? Usp { get; set; }
+            [JsonPropertyName("spec_text")] public string? SpecText { get; set; }
         }
 
         private class SearchServiceResponse
@@ -178,30 +186,44 @@ namespace TechstoreBackend.Controllers
         private static string BuildContextText(List<ChatProductSnippetDto> prods)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("Dưới đây là danh sách sản phẩm liên quan:");
+            sb.AppendLine("Dưới đây là danh sách sản phẩm liên quan (mô tả, mục đích sử dụng, điểm nổi bật, thông số):");
             int i = 1;
             foreach (var p in prods)
             {
-                sb.AppendLine($"{i}. {p.Name} - Thương hiệu: {p.Brand} - Danh mục: {p.Category} - Giá: {p.Price:N0} VND");
-                if (!string.IsNullOrWhiteSpace(p.Description))
-                {
-                    var desc = p.Description!.Length > 300 ? p.Description.Substring(0, 300) + "..." : p.Description;
-                    sb.AppendLine($"   Mô tả: {desc}");
-                }
+                sb.AppendLine($"{i}. {p.Name} | Thương hiệu: {p.Brand} | Danh mục: {p.Category} | Giá: {p.Price:N0} VND");
+                if (!string.IsNullOrWhiteSpace(p.UseCase)) sb.AppendLine($"   Mục đích sử dụng: {TrimField(p.UseCase, 300)}");
+                if (!string.IsNullOrWhiteSpace(p.Usp)) sb.AppendLine($"   Điểm nổi bật: {TrimField(p.Usp, 300)}");
+                if (!string.IsNullOrWhiteSpace(p.SpecificationsText)) sb.AppendLine($"   Thông số: {TrimField(p.SpecificationsText, 300)}");
+                else if (!string.IsNullOrWhiteSpace(p.Description)) sb.AppendLine($"   Mô tả: {TrimField(p.Description, 300)}");
                 i++;
             }
             return sb.ToString();
         }
 
+        private static string TrimField(string? value, int maxLen)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+            return value.Length > maxLen ? value.Substring(0, maxLen) + "..." : value;
+        }
+
         private static string BuildFallbackAnswer(string question, List<ChatProductSnippetDto> prods)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("Gợi ý dựa trên câu hỏi của bạn:");
+            sb.AppendLine("Gợi ý sơ bộ dựa trên danh sách sản phẩm tìm được (chưa có câu trả lời từ mô hình AI):");
             foreach (var p in prods)
             {
-                sb.AppendLine($"- {p.Name} ({p.Brand}) ~ {p.Price:N0} VND");
+                var highlight = p.Usp ?? p.UseCase ?? p.SpecificationsText ?? p.Description;
+                if (!string.IsNullOrWhiteSpace(highlight))
+                {
+                    highlight = TrimField(highlight, 120);
+                    sb.AppendLine($"- {p.Name} (~{p.Price:N0} VND): {highlight}");
+                }
+                else
+                {
+                    sb.AppendLine($"- {p.Name} (~{p.Price:N0} VND)");
+                }
             }
-            sb.AppendLine("Nếu bạn cần so sánh chi tiết hơn (hiệu năng, màn hình, pin...), hãy nói rõ tiêu chí.");
+            sb.AppendLine("Bạn có thể hỏi tiếp để lọc theo ngân sách, hiệu năng, pin hoặc nhu cầu cụ thể.");
             return sb.ToString().Trim();
         }
 

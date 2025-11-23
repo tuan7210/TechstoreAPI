@@ -12,6 +12,11 @@ Environment variables:
 - OPENAI_EMBED_MODEL (default: text-embedding-3-small)
 - SERVICE_HOST (default: 0.0.0.0)
 - SERVICE_PORT (default: 8000)
+- ENABLE_RERANK (default: false) enable cross-encoder reranking
+- CROSS_ENCODER_MODEL (default: cross-encoder/ms-marco-MiniLM-L-6-v2)
+- RERANK_POOL (default: 0 => auto top_k*2 up to 50)
+
+Supports .env loading (project root or ingestion/.env) so you don't have to export vars every run.
 
 Run:
 - pip install -r ingestion/requirements.txt
@@ -22,6 +27,17 @@ import sys
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException
+
+# Optional .env loading so user doesn't need to retype env vars each session
+try:  # pragma: no cover
+    from dotenv import load_dotenv  # type: ignore
+    load_dotenv()  # root .env
+    here = os.path.dirname(__file__)
+    env_path = os.path.join(here, ".env")
+    if os.path.exists(env_path):
+        load_dotenv(dotenv_path=env_path, override=False)
+except Exception:
+    pass
 from pydantic import BaseModel, Field
 
 # Chroma & embeddings
@@ -46,6 +62,9 @@ COLLECTION_NAME = os.environ.get("COLLECTION_NAME", "products")
 EMBED_MODEL = os.environ.get("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_EMBED_MODEL = os.environ.get("OPENAI_EMBED_MODEL", "text-embedding-3-small")
+ENABLE_RERANK = os.environ.get("ENABLE_RERANK", "false").lower() in ("1", "true", "yes")
+CROSS_ENCODER_MODEL = os.environ.get("CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+RERANK_POOL = int(os.environ.get("RERANK_POOL", "0"))  # if 0 will default to top_k*2
 
 # Prepare embedding function for queries
 class QueryEmbedder:
@@ -90,12 +109,16 @@ class SearchResult(BaseModel):
     product_id: Optional[int] = None
     chunk_index: Optional[int] = None
     score: Optional[float] = None  # distance or similarity (collection-dependent)
+    cross_score: Optional[float] = None  # score from cross-encoder reranker
     name: Optional[str] = None
     brand: Optional[str] = None
     category_name: Optional[str] = None
     price: Optional[float] = None
     image_url: Optional[str] = None
     document: Optional[str] = None
+    use_case: Optional[str] = None
+    usp: Optional[str] = None
+    spec_text: Optional[str] = None
     metadata: Dict[str, Any] = {}
 
 
@@ -111,6 +134,15 @@ if chromadb is None:  # pragma: no cover
 _client = chromadb.PersistentClient(path=CHROMA_PATH)
 _collection = _client.get_or_create_collection(name=COLLECTION_NAME)
 _embedder = QueryEmbedder()
+_cross_encoder = None
+if ENABLE_RERANK:
+    try:
+        from sentence_transformers import CrossEncoder  # type: ignore
+        _cross_encoder = CrossEncoder(CROSS_ENCODER_MODEL)
+        print(f"[search] Rerank enabled with model: {CROSS_ENCODER_MODEL}")
+    except Exception as e:
+        print(f"[search] Failed to load cross-encoder: {e}", file=sys.stderr)
+        _cross_encoder = None
 print(f"[search] Loaded collection '{COLLECTION_NAME}' from {CHROMA_PATH}")
 
 
@@ -125,33 +157,35 @@ def search(req: SearchRequest) -> SearchResponse:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Embedding error: {e}")
 
+    pool_size = req.top_k
+    if ENABLE_RERANK:
+        pool_size = RERANK_POOL if RERANK_POOL > 0 else min(req.top_k * 2, 50)
+
     try:
         res = _collection.query(
             query_embeddings=q_emb,
-            n_results=req.top_k,
-            include=["metadatas", "documents", "distances", "embeddings"],
+            n_results=pool_size,
+            include=["metadatas", "documents", "distances"],
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Vector DB error: {e}")
 
-    # Chroma returns lists per query; we have single query
     ids = res.get("ids", [[]])[0]
     metas = res.get("metadatas", [[]])[0]
     docs = res.get("documents", [[]])[0]
     dists = res.get("distances", [[]])[0]
 
-    results: List[SearchResult] = []
+    interim: List[SearchResult] = []
     for i, _id in enumerate(ids):
         meta = metas[i] if i < len(metas) else {}
         doc = docs[i] if i < len(docs) else None
         dist = dists[i] if i < len(dists) else None
-        # Extract friendly fields
         pid = None
         try:
             pid = int(meta.get("product_id")) if meta.get("product_id") is not None else None
         except Exception:
             pass
-        results.append(
+        interim.append(
             SearchResult(
                 id=_id,
                 product_id=pid,
@@ -163,11 +197,28 @@ def search(req: SearchRequest) -> SearchResponse:
                 price=meta.get("price"),
                 image_url=meta.get("image_url"),
                 document=doc,
+                use_case=meta.get("use_case"),
+                usp=meta.get("usp"),
+                spec_text=meta.get("spec_text"),
                 metadata=meta or {},
             )
         )
 
-    return SearchResponse(success=True, results=results)
+    if ENABLE_RERANK and _cross_encoder is not None and interim:
+        try:
+            # Prepare (query, passage) pairs
+            pairs = [(q, r.document or r.name or "") for r in interim]
+            scores = _cross_encoder.predict(pairs)
+            for r, s in zip(interim, scores):
+                r.cross_score = float(s)
+            # Sort by cross_score desc (fallback to original distance if None)
+            interim.sort(key=lambda x: (x.cross_score if x.cross_score is not None else -1.0), reverse=True)
+        except Exception as e:
+            print(f"[search] Rerank error: {e}", file=sys.stderr)
+
+    # Truncate to requested top_k
+    final = interim[:req.top_k]
+    return SearchResponse(success=True, results=final)
 
 
 if __name__ == "__main__":  # pragma: no cover

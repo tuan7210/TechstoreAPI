@@ -53,7 +53,7 @@ python ingestion/extract_products.py
 
 Bạn vẫn có thể override nhanh bằng biến môi trường tạm thời trong PowerShell:
 ```powershell
-$env:ENABLE_EMBED="true"; $env:DB_USER="your_user"; $env:DB_PASSWORD="your_password"; python ingestion/extract_products.py
+$env:ENABLE_EMBED="true"; $env:DB_USER="root"; $env:DB_PASSWORD="24102003"; python ingestion/extract_products.py
 ```
 Nhưng cách dùng `.env` thuận tiện hơn, ít phải gõ lại và tránh lộ mật khẩu trong lịch sử terminal screenshot.
 
@@ -86,6 +86,9 @@ This tiny FastAPI service queries the persisted Chroma collection so the .NET ba
 - `OPENAI_EMBED_MODEL` (default: text-embedding-3-small)
 - `SERVICE_HOST` (default: 0.0.0.0)
 - `SERVICE_PORT` (default: 8000)
+- `ENABLE_RERANK` (default: false) — bật Cross-Encoder re-rank sau truy vấn vector
+- `CROSS_ENCODER_MODEL` (default: cross-encoder/ms-marco-MiniLM-L-6-v2)
+- `RERANK_POOL` (default: 0) — số lượng kết quả thô ban đầu để re-rank (0 = tự động lấy top_k*2, tối đa 50)
 
 ### Run (Windows PowerShell)
 ```powershell
@@ -93,6 +96,14 @@ This tiny FastAPI service queries the persisted Chroma collection so the .NET ba
 # start the microservice
 python -m uvicorn ingestion.search_service:app --host 0.0.0.0 --port 8000
 ```
+
+#### Bật re-rank (tùy chọn)
+```powershell
+$env:ENABLE_RERANK="true"
+$env:CROSS_ENCODER_MODEL="cross-encoder/ms-marco-MiniLM-L-6-v2"
+python -m uvicorn ingestion.search_service:app --host 0.0.0.0 --port 8000
+```
+Re-rank sẽ: lấy thêm pool kết quả (ví dụ top_k*2), tính điểm lại bằng mô hình cross-encoder rồi sắp xếp theo `cross_score`.
 
 ### cURL quick test (optional)
 ```powershell
@@ -116,3 +127,12 @@ If you already have `ingestion/output/products.jsonl` and only need to build the
 python ingestion/embed_existing_products.py
 ```
 Set env vars (optional): `PRODUCTS_PATH`, `CHROMA_PATH`, `COLLECTION_NAME`, `EMBED_MODEL`.
+
+## Nâng cấp retrieval (đã triển khai)
+- Metadata lưu thêm: `use_case`, `usp`, `spec_text` (thông số đã flatten) cho từng chunk.
+- Search service trả về các trường này để backend dựng context giàu cấu trúc.
+- Tuỳ chọn re-rank Cross-Encoder: bật bằng `ENABLE_RERANK=true`.
+
+### Lưu ý hiệu năng
+- Cross-Encoder sẽ chậm hơn (thường +20–80ms tuỳ số lượng pool). Giữ `top_k` nhỏ (3–8) để trải nghiệm tốt.
+- Nếu latency quá cao: tắt re-rank (`ENABLE_RERANK=false`) hoặc giảm `RERANK_POOL`.

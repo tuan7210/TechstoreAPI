@@ -18,6 +18,9 @@ namespace TechstoreBackend.Models.DTOs
         public decimal Price { get; set; }
         public string? Description { get; set; }
         public string? ImageUrl { get; set; }
+        public string? UseCase { get; set; }
+        public string? Usp { get; set; }
+        public string? SpecificationsText { get; set; }
     }
 
     public class ChatResponseDto

@@ -13,7 +13,7 @@ Environment variables:
 Run (PowerShell):
   python ingestion/embed_existing_products.py
 """
-import os, json, sys
+import os, json, sys, decimal
 from typing import Any, Dict, List
 
 try:
@@ -106,6 +106,21 @@ def build_content(row: Dict[str, Any]) -> str:
     return ". ".join([p for p in parts if p]).strip()
 
 
+def _sanitize_value(v: Any) -> Any:
+    if isinstance(v, decimal.Decimal):
+        try:
+            return float(v)
+        except Exception:
+            return str(v)
+    if v is None or isinstance(v, (str, int, float, bool)):
+        return v
+    return str(v)
+
+
+def sanitize_metadata(meta: Dict[str, Any]) -> Dict[str, Any]:
+    return {k: _sanitize_value(v) for k, v in meta.items()}
+
+
 def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP):
     if not text: return []
     chunks = []
@@ -152,13 +167,16 @@ for row in rows:
         "category_name": row.get("category_name"),
         "price": row.get("price"),
         "image_url": row.get("image_url"),
+        "use_case": (row.get("use_case") or "").strip(),
+        "usp": (row.get("usp") or "").strip(),
+        "spec_text": flatten_spec_for_text(row.get("specifications"))[:1200],
     }
     for idx, chunk in enumerate(chunk_text(content)):
         if not chunk: continue
         documents.append(chunk)
         m = dict(meta_base)
         m["chunk_index"] = idx
-        metadatas.append(m)
+        metadatas.append(sanitize_metadata(m))
         ids.append(f"p{pid}_c{idx}")
 
 if not documents:

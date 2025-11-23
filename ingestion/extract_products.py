@@ -16,6 +16,7 @@ Environment variables:
 Requires: mysql-connector-python, python-dotenv (optional, for .env loading)
 """
 import json
+import decimal
 import os
 import sys
 from typing import Dict, List, Any, Iterable, Tuple
@@ -23,7 +24,13 @@ from datetime import date, datetime
 
 try:
     from dotenv import load_dotenv  # type: ignore
+    # Load .env from project root (current working directory)
     load_dotenv()
+    # Also try to load .env placed next to this script: ingestion/.env
+    here = os.path.dirname(__file__)
+    env_path = os.path.join(here, ".env")
+    if os.path.exists(env_path):
+        load_dotenv(dotenv_path=env_path, override=False)
 except Exception:
     # dotenv is optional; continue if not present
     pass
@@ -53,16 +60,75 @@ CHUNK_OVERLAP = int(os.environ.get("CHUNK_OVERLAP", "150"))
 
 
 def get_db_config() -> Dict[str, Any]:
-    cfg = {
-        "host": os.environ.get("DB_HOST", "localhost"),
-        "port": int(os.environ.get("DB_PORT", "3306")),
-        "user": os.environ.get("DB_USER"),
-        "password": os.environ.get("DB_PASSWORD"),
-        "database": os.environ.get("DB_NAME", DEFAULT_DB_NAME),
-    }
-    missing = [k for k, v in cfg.items() if v in (None, "") and k in ("user", "password")]
+    def parse_conn_str(cs: str) -> Dict[str, Any]:
+        out: Dict[str, Any] = {}
+        try:
+            parts = [p.strip() for p in cs.split(";") if p.strip()]
+            for p in parts:
+                if "=" not in p:
+                    continue
+                k, v = p.split("=", 1)
+                key = k.strip().lower()
+                val = v.strip()
+                out[key] = val
+        except Exception:
+            return {}
+        # normalize keys
+        host = out.get("server") or out.get("host") or out.get("data source")
+        user = out.get("user") or out.get("uid") or out.get("username")
+        pwd = out.get("password") or out.get("pwd")
+        db = out.get("database") or out.get("initial catalog")
+        port = out.get("port")
+        return {
+            "host": host,
+            "user": user,
+            "password": pwd,
+            "database": db,
+            "port": int(port) if port and port.isdigit() else None,
+        }
+
+    def load_from_appsettings() -> Dict[str, Any]:
+        here = os.path.dirname(__file__)
+        root = os.path.abspath(os.path.join(here, ".."))  # project root
+        for fname in ("appsettings.Development.json", "appsettings.json"):
+            path = os.path.join(root, fname)
+            if not os.path.exists(path):
+                continue
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                cs = (
+                    data.get("ConnectionStrings", {}).get("DefaultConnection")
+                    if isinstance(data, dict)
+                    else None
+                )
+                if cs:
+                    parsed = parse_conn_str(cs)
+                    return {k: v for k, v in parsed.items() if v not in (None, "")}
+            except Exception:
+                continue
+        return {}
+
+    app_cfg = load_from_appsettings()
+
+    host = os.environ.get("DB_HOST") or app_cfg.get("host") or "localhost"
+    port_val = os.environ.get("DB_PORT") or app_cfg.get("port") or "3306"
+    try:
+        port = int(port_val) if isinstance(port_val, str) else int(port_val)
+    except Exception:
+        port = 3306
+    user = os.environ.get("DB_USER") or app_cfg.get("user")
+    password = os.environ.get("DB_PASSWORD") or app_cfg.get("password")
+    database = os.environ.get("DB_NAME") or app_cfg.get("database") or DEFAULT_DB_NAME
+
+    cfg = {"host": host, "port": port, "user": user, "password": password, "database": database}
+    missing = [k for k, v in (("user", user), ("password", password)) if v in (None, "")]
     if missing:
-        raise RuntimeError(f"Missing required DB env vars: {', '.join(missing)}. Set DB_USER and DB_PASSWORD.")
+        raise RuntimeError(
+            "Missing required DB env vars: "
+            + ", ".join(missing)
+            + ". Set DB_USER and DB_PASSWORD or provide them in appsettings.json connection string."
+        )
     return cfg
 
 
@@ -230,7 +296,39 @@ def make_metadata(row: Dict[str, Any]) -> Dict[str, Any]:
         "is_best_seller",
     ]
     meta = {k: row.get(k) for k in keys}
-    return meta
+
+    # Add structured textual fields for richer context (if present)
+    meta["use_case"] = (row.get("use_case") or "").strip()
+    meta["usp"] = (row.get("usp") or "").strip()
+    try:
+        meta["spec_text"] = flatten_spec_for_text(row.get("specifications"))[:1200]
+    except Exception:
+        meta["spec_text"] = ""
+
+    return sanitize_metadata(meta)
+
+
+def _sanitize_value(v: Any) -> Any:
+    if isinstance(v, decimal.Decimal):
+        try:
+            return float(v)
+        except Exception:
+            return str(v)
+    if isinstance(v, (datetime, date)):
+        return v.isoformat()
+    if isinstance(v, (bytes, bytearray)):
+        try:
+            return v.decode("utf-8", "ignore")
+        except Exception:
+            return str(v)
+    if v is None or isinstance(v, (str, int, float, bool)):
+        return v
+    # Fallback to string for unsupported types
+    return str(v)
+
+
+def sanitize_metadata(meta: Dict[str, Any]) -> Dict[str, Any]:
+    return {k: _sanitize_value(v) for k, v in meta.items()}
 
 
 def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> Iterable[str]:
@@ -346,7 +444,8 @@ def embed_and_load(rows: List[Dict[str, Any]]) -> None:
             metachunk["chunk_index"] = idx
             metachunk["name"] = row.get("name")
             ids.append(f"p{pid}_c{idx}")
-            metadatas.append(metachunk)
+            # Ensure all metadata values are supported by Chroma
+            metadatas.append(sanitize_metadata(metachunk))
 
     if not documents:
         print("[embed] No documents to embed")
