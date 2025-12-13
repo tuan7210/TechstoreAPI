@@ -100,7 +100,7 @@ CREATE TABLE Review (
     INDEX idx_product_rating (product_id, rating),
     INDEX idx_user_reviews (user_id, created_at)
 );
-
+SET SQL_SAFE_UPDATES = 0;
 -- Trigger để tự động verify review khi order đã completed
 DELIMITER //
 CREATE TRIGGER verify_review_after_insert
@@ -233,41 +233,41 @@ INSERT INTO Category (name, description) VALUES
 ('Máy tính bảng','Các loại máy tính bảng chính hãng, hiệu năng cao');
 INSERT INTO Product (name, description, price, original_price, brand, stock_quantity, category_id, image_url, specifications, rating, review_count, is_new, is_best_seller) VALUES
 -- Điện thoại
-('iPhone 15 128GB', 'iPhone 15 chính hãng VN/A, màu đen', 25000000, 27000000, 'Apple', 50, 1, 'https://example.com/images/iphone15.jpg', 
+('iPhone 15 128GB', 'iPhone 15 chính hãng VN/A, màu đen', 25000000, 27000000, 'Apple', 50, 1, 'images/iphone15.jpg', 
  '{"screen": "6.1 inch Super Retina XDR", "chip": "A17 Bionic", "ram": "6GB", "storage": "128GB", "camera": "48MP + 12MP", "battery": "3349mAh"}', 
  4.5, 128, TRUE, TRUE),
 
-('Samsung Galaxy S24', 'Samsung Galaxy S24 chính hãng, màu trắng', 22000000, 24000000, 'Samsung', 40, 1, 'https://example.com/images/galaxy_s24.jpg',
+('Samsung Galaxy S24', 'Samsung Galaxy S24 chính hãng, màu trắng', 22000000, 24000000, 'Samsung', 40, 1, '/images/galaxy_s24.jpg',
  '{"screen": "6.2 inch Dynamic AMOLED 2X", "chip": "Exynos 2400", "ram": "8GB", "storage": "256GB", "camera": "50MP + 12MP + 10MP", "battery": "4000mAh"}',
  4.3, 95, TRUE, FALSE),
 
-('Xiaomi Redmi Note 13', 'Redmi Note 13 5G chính hãng, màu xanh', 7000000, 8000000, 'Xiaomi', 60, 1, 'https://example.com/images/redmi_note13.jpg',
+('Xiaomi Redmi Note 13', 'Redmi Note 13 5G chính hãng, màu xanh', 7000000, 8000000, 'Xiaomi', 60, 1, '/redmi_note13.jpg',
  '{"screen": "6.67 inch AMOLED", "chip": "Snapdragon 7s Gen 2", "ram": "8GB", "storage": "128GB", "camera": "108MP + 8MP + 2MP", "battery": "5000mAh"}',
  4.2, 67, FALSE, TRUE),
 
 -- Laptop
-('MacBook Air M3 2025', 'MacBook Air M3 8GB/256GB, màu bạc', 32000000, 35000000, 'Apple', 30, 2, 'https://example.com/images/macbook_air_m3.jpg',
+('MacBook Air M3 2025', 'MacBook Air M3 8GB/256GB, màu bạc', 32000000, 35000000, 'Apple', 30, 2, '/images/macbook_air_m3.jpg',
  '{"screen": "13.6 inch Liquid Retina", "chip": "Apple M3", "ram": "8GB", "storage": "256GB SSD", "graphics": "8-core GPU", "weight": "1.24kg"}',
  4.6, 89, TRUE, TRUE),
 
-('Dell XPS 13', 'Dell XPS 13 2025, i7, 16GB RAM, 512GB SSD', 35000000, 38000000, 'Dell', 25, 2, 'https://example.com/images/dell_xps_13.jpg',
+('Dell XPS 13', 'Dell XPS 13 2025, i7, 16GB RAM, 512GB SSD', 35000000, 38000000, 'Dell', 25, 2, '/images/dell_xps_13.jpg',
  '{"screen": "13.4 inch InfinityEdge", "cpu": "Intel Core i7-1365U", "ram": "16GB LPDDR5", "storage": "512GB SSD", "graphics": "Intel Iris Xe", "weight": "1.19kg"}',
  4.4, 56, FALSE, FALSE),
 
-('ASUS ROG Zephyrus G14', 'Laptop gaming ASUS ROG G14, Ryzen 9, 32GB RAM', 42000000, 45000000, 'ASUS', 20, 2, 'https://example.com/images/asus_rog_g14.jpg',
+('ASUS ROG Zephyrus G14', 'Laptop gaming ASUS ROG G14, Ryzen 9, 32GB RAM', 42000000, 45000000, 'ASUS', 20, 2, '/images/asus_rog_g14.jpg',
  '{"screen": "14 inch QHD 165Hz", "cpu": "AMD Ryzen 9 7940HS", "ram": "32GB DDR5", "storage": "1TB SSD", "graphics": "RTX 4070", "weight": "1.65kg"}',
  4.7, 43, FALSE, TRUE),
 
 -- Phụ kiện
-('Tai nghe AirPods Pro 2', 'Tai nghe AirPods Pro 2 chính hãng Apple', 5200000, 5500000, 'Apple', 80, 3, 'https://example.com/images/airpods_pro_2.jpg',
+('Tai nghe AirPods Pro 2', 'Tai nghe AirPods Pro 2 chính hãng Apple', 5200000, 5500000, 'Apple', 80, 3, '/images/airpods_pro_2.jpg',
  '{"type": "In-ear", "connection": "Bluetooth 5.3", "anc": "Active Noise Cancellation", "battery": "6h + 24h with case", "features": "Spatial Audio, Transparency Mode"}',
  4.5, 234, FALSE, TRUE),
 
-('Sạc nhanh Anker 65W', 'Sạc nhanh Anker 65W PowerPort, sạc laptop & điện thoại', 850000, 950000, 'Anker', 100, 3, 'https://example.com/images/anker_65w.jpg',
+('Sạc nhanh Anker 65W', 'Sạc nhanh Anker 65W PowerPort, sạc laptop & điện thoại', 850000, 950000, 'Anker', 100, 3, '/images/anker_65w.jpg',
  '{"power": "65W", "ports": "USB-C x2, USB-A x1", "tech": "PowerIQ 3.0", "size": "70 x 70 x 32mm", "weight": "130g"}',
  4.6, 187, FALSE, FALSE),
 
-('Chuột Logitech MX Master 3', 'Chuột không dây Logitech MX Master 3', 2500000, 2800000, 'Logitech', 50, 3, 'https://example.com/images/logitech_mx_master_3.jpg',
+('Chuột Logitech MX Master 3', 'Chuột không dây Logitech MX Master 3', 2500000, 2800000, 'Logitech', 50, 3, '/images/logitech_mx_master_3.jpg',
  '{"type": "Wireless", "connection": "Bluetooth + USB Receiver", "dpi": "4000 DPI", "battery": "70 days", "features": "MagSpeed scroll, Multi-device"}',
  4.4, 156, FALSE, FALSE);
 
@@ -276,7 +276,6 @@ INSERT INTO Product (name, description, price, original_price, brand, stock_quan
 -- ====================================================
 -- 1. Điện thoại
 -- ====================================================
-
 UPDATE Product
 SET
     use_case = 'Lý tưởng cho người dùng hệ sinh thái Apple, cần hiệu năng ổn định, camera chất lượng cao và thiết kế bền bỉ. Phù hợp cho công việc văn phòng và giải trí cơ bản.',
@@ -528,3 +527,4 @@ VALUES
     '{"screen": "12.4 inch TFT LCD", "chip": "Snapdragon 778G", "ram": "6GB", "storage": "128GB", "features": "Kèm bút S Pen", "battery": "10090mAh"}', 
     4.5, 55, FALSE, FALSE, 
     'Sinh viên, giáo viên cần màn hình lớn để ghi chú, vẽ và học tập trong thời gian dài.', 'Màn hình lớn 12.4 inch, Pin 10090mAh, Kèm bút S Pen.', '12 tháng chính hãng', 14);
+SET SQL_SAFE_UPDATES = 1;

@@ -1,0 +1,101 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace TechstoreBackend.Services
+{
+    public class PayOSService
+    {
+        private readonly string _clientId;
+        private readonly string _apiKey;
+        private readonly string _checksumKey;
+        private readonly HttpClient _httpClient;
+
+        public PayOSService(IConfiguration config, HttpClient httpClient)
+        {
+            _clientId = config["PayOS:ClientId"];
+            _apiKey = config["PayOS:ApiKey"];
+            _checksumKey = config["PayOS:ChecksumKey"];
+            _httpClient = httpClient;
+        }
+
+        // Hàm tạo Link thanh toán
+        public async Task<string> CreatePaymentLink(long orderCode, int amount, string description, string returnUrl, string cancelUrl)
+        {
+            var url = "https://api-merchant.payos.vn/v2/payment-requests";
+
+            // 1. Tạo dữ liệu body
+            var requestData = new
+            {
+                orderCode = orderCode,
+                amount = amount,
+                description = description,
+                buyerName = "Khach hang",
+                buyerPhone = "0900000000",
+                cancelUrl = cancelUrl,
+                returnUrl = returnUrl,
+                expiredAt = (long)(DateTime.UtcNow.AddMinutes(15) - new DateTime(1970, 1, 1)).TotalSeconds,
+                // signature sẽ được tính ở bước sau
+            };
+
+            // 2. Tạo chữ ký (Signature) để bảo mật
+            // Công thức: amount=...&cancelUrl=...&description=...&orderCode=...&returnUrl=...
+            // Phải sắp xếp theo anlphabet key
+            var signatureRaw = $"amount={amount}&cancelUrl={cancelUrl}&description={description}&orderCode={orderCode}&returnUrl={returnUrl}";
+            var signature = ComputeHmacSha256(signatureRaw, _checksumKey);
+
+            // 3. Gép signature vào body
+            var finalBody = new
+            {
+                orderCode,
+                amount,
+                description,
+                buyerName = "Khach hang",
+                buyerPhone = "0900000000",
+                cancelUrl,
+                returnUrl,
+                signature = signature, // Quan trọng
+                expiredAt = requestData.expiredAt
+            };
+
+            // 4. Gửi Request
+            var jsonBody = JsonSerializer.Serialize(finalBody);
+            var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+            
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Add("x-client-id", _clientId);
+            _httpClient.DefaultRequestHeaders.Add("x-api-key", _apiKey);
+
+            var response = await _httpClient.PostAsync(url, content);
+            var responseString = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception($"PayOS Error: {responseString}");
+            }
+
+            // 5. Parse kết quả để lấy checkoutUrl
+            using var doc = JsonDocument.Parse(responseString);
+            var root = doc.RootElement;
+            if (root.GetProperty("code").GetString() == "00")
+            {
+                return root.GetProperty("data").GetProperty("checkoutUrl").GetString();
+            }
+            
+            throw new Exception("PayOS API returned error code");
+        }
+
+        // Hàm tiện ích: Tính toán HMAC SHA256
+        private string ComputeHmacSha256(string data, string key)
+        {
+            byte[] keyBytes = Encoding.UTF8.GetBytes(key);
+            byte[] messageBytes = Encoding.UTF8.GetBytes(data);
+            using (var hmac = new HMACSHA256(keyBytes))
+            {
+                byte[] hashBytes = hmac.ComputeHash(messageBytes);
+                return BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
+            }
+        }
+    }
+}

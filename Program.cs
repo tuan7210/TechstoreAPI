@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using TechstoreBackend.Middleware;
+using TechstoreBackend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,6 +46,21 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"] ?? ""))
     };
 });
+
+// PAYOS - TODO: Configure PayOS when SDK is properly set up
+// var payOSConfig = builder.Configuration.GetSection("PayOS");
+// global::PayOS.PayOSClient payOSInstance = new global::PayOS.PayOSClient(
+//     payOSConfig["ClientId"] ?? throw new Exception("Missing ClientId"),
+//     payOSConfig["ApiKey"] ?? throw new Exception("Missing ApiKey"),
+//     payOSConfig["ChecksumKey"] ?? throw new Exception("Missing ChecksumKey")
+// );
+// builder.Services.AddSingleton(payOSInstance);
+
+// ✅ Add HttpClient for PayOS
+builder.Services.AddHttpClient();
+
+// ✅ Add PayOS Service
+builder.Services.AddScoped<PayOSService>();
 
 // ✅ CORS setup
 builder.Services.AddCors(options =>
