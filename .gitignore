@@ -394,3 +394,10 @@ logs/
 # Temporary files
 *.tmp
 *.temp
+
+# AI/ML data and caches (local only)
+ingestion/chroma/
+ingestion/hf_cache/
+ingestion/data/
+ingestion/datasets/
+ingestion/output/
