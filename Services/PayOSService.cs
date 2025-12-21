@@ -21,7 +21,7 @@ namespace TechstoreBackend.Services
         }
 
         // Hàm tạo Link thanh toán
-        public async Task<string> CreatePaymentLink(long orderCode, int amount, string description, string returnUrl, string cancelUrl)
+        public async Task<object> CreatePaymentLink(long orderCode, int amount, string description, string returnUrl, string cancelUrl)
         {
             var url = "https://api-merchant.payos.vn/v2/payment-requests";
 
@@ -62,7 +62,7 @@ namespace TechstoreBackend.Services
             // 4. Gửi Request
             var jsonBody = JsonSerializer.Serialize(finalBody);
             var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-            
+
             _httpClient.DefaultRequestHeaders.Clear();
             _httpClient.DefaultRequestHeaders.Add("x-client-id", _clientId);
             _httpClient.DefaultRequestHeaders.Add("x-api-key", _apiKey);
@@ -70,22 +70,29 @@ namespace TechstoreBackend.Services
             var response = await _httpClient.PostAsync(url, content);
             var responseString = await response.Content.ReadAsStringAsync();
 
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new Exception($"PayOS Error: {responseString}");
-            }
-
-            // 5. Parse kết quả để lấy checkoutUrl
+            // 5. Parse kết quả (SỬA ĐOẠN NÀY)
             using var doc = JsonDocument.Parse(responseString);
             var root = doc.RootElement;
+
             if (root.GetProperty("code").GetString() == "00")
             {
-                return root.GetProperty("data").GetProperty("checkoutUrl").GetString();
+                var data = root.GetProperty("data");
+                // Trả về object chứa đầy đủ thông tin để Client tự vẽ QR
+                return new 
+                {
+                    bin = data.GetProperty("bin").GetString(),
+                    accountNumber = data.GetProperty("accountNumber").GetString(),
+                    accountName = data.GetProperty("accountName").GetString(),
+                    amount = data.GetProperty("amount").GetInt32(),
+                    description = data.GetProperty("description").GetString(),
+                    orderCode = data.GetProperty("orderCode").GetInt64(),
+                    checkoutUrl = data.GetProperty("checkoutUrl").GetString(),
+                    qrCode = data.GetProperty("qrCode").GetString() // Chuỗi raw QR nếu muốn dùng thư viện
+                };
             }
-            
-            throw new Exception("PayOS API returned error code");
-        }
 
+            throw new Exception($"PayOS Error: {root.GetProperty("desc").GetString()}");
+        }
         // Hàm tiện ích: Tính toán HMAC SHA256
         private string ComputeHmacSha256(string data, string key)
         {

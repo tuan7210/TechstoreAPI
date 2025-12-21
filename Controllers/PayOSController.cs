@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using TechstoreBackend.Models;
+using TechstoreBackend.Services;
 using TechstoreBackend.Models.DTOs;
-using TechstoreBackend.Services; // Import Service vừa tạo
 
 namespace TechstoreBackend.Controllers
 {
@@ -22,23 +21,22 @@ namespace TechstoreBackend.Controllers
             try
             {
                 long orderCode = long.Parse(DateTimeOffset.Now.ToString("ffffff"));
-                // Quy ước: giá trị truyền vào API phải chính xác
-                // description không dấu, không ký tự đặc biệt, tối đa 25 ký tự để an toàn nhất
-                string description = $"Thanh toan don {orderCode}"; 
+                string description = $"Thanh toan don {orderCode}";
 
-                string checkoutUrl = await _payOSService.CreatePaymentLink(
-                    orderCode, 
-                    body.Price, 
-                    description, 
-                    "http://localhost:5173/success", // Link frontend
-                    "http://localhost:5173/cancel"   // Link frontend
+                // Gọi service đã sửa (Lưu ý: hàm CreatePaymentLink bên Service giờ trả về object)
+                var paymentResult = await _payOSService.CreatePaymentLink(
+                    orderCode,
+                    body.Price,
+                    description,
+                    "http://localhost:5173/success",
+                    "http://localhost:5173/cancel"
                 );
 
-                return Ok(new { checkoutUrl = checkoutUrl });
+                // Trả nguyên cục data này về cho React
+                return Ok(paymentResult);
             }
             catch (Exception exception)
             {
-                Console.WriteLine(exception.Message); // Log lỗi ra console server để debug
                 return BadRequest(new { message = exception.Message });
             }
         }
