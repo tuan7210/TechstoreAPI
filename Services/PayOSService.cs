@@ -36,12 +36,9 @@ namespace TechstoreBackend.Services
                 cancelUrl = cancelUrl,
                 returnUrl = returnUrl,
                 expiredAt = (long)(DateTime.UtcNow.AddMinutes(15) - new DateTime(1970, 1, 1)).TotalSeconds,
-                // signature sẽ được tính ở bước sau
             };
 
             // 2. Tạo chữ ký (Signature) để bảo mật
-            // Công thức: amount=...&cancelUrl=...&description=...&orderCode=...&returnUrl=...
-            // Phải sắp xếp theo anlphabet key
             var signatureRaw = $"amount={amount}&cancelUrl={cancelUrl}&description={description}&orderCode={orderCode}&returnUrl={returnUrl}";
             var signature = ComputeHmacSha256(signatureRaw, _checksumKey);
 
@@ -59,7 +56,6 @@ namespace TechstoreBackend.Services
                 expiredAt = requestData.expiredAt
             };
 
-            // 4. Gửi Request
             var jsonBody = JsonSerializer.Serialize(finalBody);
             var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
 
@@ -92,6 +88,7 @@ namespace TechstoreBackend.Services
             }
 
             throw new Exception($"PayOS Error: {root.GetProperty("desc").GetString()}");
+    // a        
         }
         // Hàm tiện ích: Tính toán HMAC SHA256
         private string ComputeHmacSha256(string data, string key)

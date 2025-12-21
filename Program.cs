@@ -9,16 +9,13 @@ using TechstoreBackend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// ✅ Add Exception Handler
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
-// ✅ Add DbContext with MySQL
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(
         builder.Configuration.GetConnectionString("DefaultConnection"),
@@ -26,7 +23,6 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     )
 );
 
-// ✅ JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(options =>
 {
@@ -47,27 +43,15 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// PAYOS - TODO: Configure PayOS when SDK is properly set up
-// var payOSConfig = builder.Configuration.GetSection("PayOS");
-// global::PayOS.PayOSClient payOSInstance = new global::PayOS.PayOSClient(
-//     payOSConfig["ClientId"] ?? throw new Exception("Missing ClientId"),
-//     payOSConfig["ApiKey"] ?? throw new Exception("Missing ApiKey"),
-//     payOSConfig["ChecksumKey"] ?? throw new Exception("Missing ChecksumKey")
-// );
-// builder.Services.AddSingleton(payOSInstance);
-
-// ✅ Add HttpClient for PayOS
 builder.Services.AddHttpClient();
 
-// ✅ Add PayOS Service
 builder.Services.AddScoped<PayOSService>();
 
-// ✅ CORS setup
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins("http://localhost:5173") // React frontend
+        policy.WithOrigins("http://localhost:5173") 
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
@@ -75,10 +59,8 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// ✅ Add Exception Handler
 app.UseExceptionHandler();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -87,7 +69,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// ✅ Thứ tự quan trọng: CORS → Auth → Controller
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
