@@ -5,19 +5,17 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using TechstoreBackend.Middleware;
+using TechstoreBackend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// ✅ Add Exception Handler
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
-// ✅ Add DbContext with MySQL
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(
         builder.Configuration.GetConnectionString("DefaultConnection"),
@@ -25,7 +23,6 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     )
 );
 
-// ✅ JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(options =>
 {
@@ -46,12 +43,15 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// ✅ CORS setup
+builder.Services.AddHttpClient();
+
+builder.Services.AddScoped<PayOSService>();
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins("http://localhost:5173") // React frontend
+        policy.WithOrigins("http://localhost:5173") 
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
@@ -59,10 +59,8 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// ✅ Add Exception Handler
 app.UseExceptionHandler();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -71,7 +69,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// ✅ Thứ tự quan trọng: CORS → Auth → Controller
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
