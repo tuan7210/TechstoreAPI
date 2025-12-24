@@ -32,7 +32,7 @@ namespace TechstoreBackend.Controllers
                     "http://localhost:5173/cancel"
                 );
 
-                // Trả nguyên cục data này về cho React
+                // Trả data này về cho React
                 return Ok(paymentResult);
             }
             catch (Exception exception)

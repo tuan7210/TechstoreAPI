@@ -13,7 +13,7 @@ Environment variables:
 Run (PowerShell):
   python ingestion/embed_existing_products.py
 """
-import os, json, sys, decimal
+import os, json, sys, decimal, re, unicodedata
 from typing import Any, Dict, List
 
 try:
@@ -27,15 +27,29 @@ try:
 except Exception:
     SentenceTransformer = None  # type: ignore
 
+# --- NORMALIZATION UTILS ---
+def normalize_for_embed(text: str) -> str:
+    if not text:
+        return ""
+    text = unicodedata.normalize("NFC", text)
+    text = text.lower()
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+def normalize_for_match(text: str) -> str:
+    t = unicodedata.normalize("NFKD", text or "")
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    return t.lower()
+
 PRODUCTS_PATH = os.environ.get("PRODUCTS_PATH", os.path.join("ingestion", "output", "products.jsonl"))
 CHROMA_PATH = os.environ.get("CHROMA_PATH", os.path.join("ingestion", "chroma"))
 COLLECTION_NAME = os.environ.get("COLLECTION_NAME", "products")
-EMBED_MODEL = os.environ.get("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+EMBED_MODEL = os.environ.get("EMBED_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_EMBED_MODEL = os.environ.get("OPENAI_EMBED_MODEL", "text-embedding-3-small")
 BATCH = int(os.environ.get("EMBED_BATCH", "64"))
-CHUNK_SIZE = int(os.environ.get("CHUNK_SIZE", "1200"))
-CHUNK_OVERLAP = int(os.environ.get("CHUNK_OVERLAP", "150"))
+CHUNK_SIZE = 99999  # No chunking, 1 product = 1 embedding
+CHUNK_OVERLAP = 0
 
 if not os.path.exists(PRODUCTS_PATH):
     sys.exit(f"[error] Products file not found: {PRODUCTS_PATH}. Run extract_products.py first (ENABLE_EMBED optional).")
@@ -134,6 +148,13 @@ def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP):
     return chunks
 
 client = chromadb.PersistentClient(path=CHROMA_PATH)
+
+# Xóa collection nếu đã tồn tại để đảm bảo dữ liệu mới nhất
+try:
+    client.delete_collection(name=COLLECTION_NAME)
+    print(f"[info] Deleted existing collection '{COLLECTION_NAME}' for clean embed.")
+except Exception:
+    pass
 collection = client.get_or_create_collection(name=COLLECTION_NAME)
 
 # Embedding function
@@ -160,6 +181,7 @@ ids: List[str] = []
 for row in rows:
     pid = row.get("product_id")
     content = build_content(row)
+    content_norm = normalize_for_embed(content)
     meta_base = {
         "product_id": pid,
         "name": row.get("name"),
@@ -171,13 +193,14 @@ for row in rows:
         "usp": (row.get("usp") or "").strip(),
         "spec_text": flatten_spec_for_text(row.get("specifications"))[:1200],
     }
-    for idx, chunk in enumerate(chunk_text(content)):
-        if not chunk: continue
-        documents.append(chunk)
-        m = dict(meta_base)
-        m["chunk_index"] = idx
-        metadatas.append(sanitize_metadata(m))
-        ids.append(f"p{pid}_c{idx}")
+    # 1 product = 1 embedding
+    documents.append(content_norm)
+    m = dict(meta_base)
+    m["chunk_index"] = 0
+    metadatas.append(sanitize_metadata(m))
+    ids.append(f"p{pid}_c0")
+    # Log image_url để debug
+    print(f"[debug] product_id={pid}, image_url={row.get('image_url')}")
 
 if not documents:
     sys.exit("[error] No documents prepared.")

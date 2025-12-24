@@ -26,6 +26,7 @@ import os
 import sys
 from typing import Any, Dict, List, Optional
 import re
+import unicodedata
 
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -81,7 +82,7 @@ except ImportError:
 
 CHROMA_PATH = os.environ.get("CHROMA_PATH", os.path.join("ingestion", "chroma"))
 COLLECTION_NAME = os.environ.get("COLLECTION_NAME", "products")
-EMBED_MODEL = os.environ.get("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+EMBED_MODEL = os.environ.get("EMBED_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_EMBED_MODEL = os.environ.get("OPENAI_EMBED_MODEL", "text-embedding-3-small")
 ENABLE_RERANK = os.environ.get("ENABLE_RERANK", "false").lower() in ("1", "true", "yes")
@@ -92,6 +93,24 @@ RERANK_POOL = int(os.environ.get("RERANK_POOL", "0"))  # if 0 will default to to
 LLM_MODEL_ID = os.environ.get("LLM_MODEL_ID", "TinyLlama/TinyLlama-1.1B-Chat-v1.0")
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "hf_cache")
 ENABLE_LOCAL_LLM = os.environ.get("ENABLE_LOCAL_LLM", "false").lower() in ("1", "true", "yes")
+
+# Optional: extra out-of-domain keywords, comma-separated (e.g., "oto,xe may,xe tai")
+OOD_EXTRA = [k.strip().lower() for k in os.environ.get("OOD_EXTRA", "").split(",") if k.strip()]
+
+
+# --- NORMALIZATION UTILS ---
+def normalize_for_embed(text: str) -> str:
+    if not text:
+        return ""
+    text = unicodedata.normalize("NFC", text)
+    text = text.lower()
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+def normalize_for_match(text: str) -> str:
+    t = unicodedata.normalize("NFKD", text or "")
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    return t.lower()
 
 # Prepare embedding function for queries
 class QueryEmbedder:
@@ -230,39 +249,109 @@ def load_llm():
 if ENABLE_LOCAL_LLM:
     load_llm()
 
+
+
+# _normalize is now replaced by normalize_for_match for intent/filter only
+
+
+def is_out_of_domain(query: str) -> Optional[str]:
+    """
+    Detect queries clearly outside Techstore's catalog (e.g., vehicles, real estate services).
+    Returns a short label if matched, else None.
+    Extend with OOD_EXTRA env (comma-separated tokens) if needed.
+    """
+    q = normalize_for_match(query)
+
+    ood_groups = [
+        ("xe cộ", [
+            "oto", "o to", "xe hoi", "xe may", "xe may dien", "motor", "motorbike", "xe mo to",
+            "scooter", "xe tay ga", "xe so", "xe tai", "truck", "bus", "xe khach", "xe dap", "bicycle", "car", "vehicle"
+        ]),
+        ("bất động sản", ["bat dong san", "nha dat", "can ho", "chung cu", "biet thu", "dat nen"]),
+        ("thời trang", ["quan ao", "thoi trang", "giay dep", "giay sneaker", "ao", "quan", "vay", "tui xach"]),
+    ]
+
+    # Merge extra tokens to the first group by default
+    if OOD_EXTRA:
+        ood_groups[0] = (ood_groups[0][0], ood_groups[0][1] + OOD_EXTRA)
+
+    for label, keywords in ood_groups:
+        if any(k in q for k in keywords):
+            return label
+    return None
+
 def detect_intent(query: str) -> str:
     """
     Simple Rule-based Intent Classification.
     The order of checks is important.
     """
-    q_lower = query.lower()
-    
-    # Specific intents first
-    gaming_keywords = ["game", "gaming", "chơi game", "đồ họa", "nặng", "lol", "pubg", "valorant", "gta", "render"]
-    if any(k in q_lower for k in gaming_keywords):
+    # Normalize: lower-case and remove diacritics to improve matching
+    q = normalize_for_match(query)
+
+    # helper to check any keyword present
+    def has_any(keywords: List[str]) -> bool:
+        return any(k in q for k in keywords)
+
+    # Expanded keyword lists (normalized, Vietnamese no-diacritics variants included)
+    gaming_keywords = [
+        "game", "gaming", "choi game", "do hoa", "nang", "lol", "pubg", "valorant", "gta", "render",
+        "fps", "rtx", "gtx"
+    ]
+    if has_any(gaming_keywords):
         return "GAMING"
-        
-    office_keywords = ["văn phòng", "mỏng nhẹ", "sinh viên", "nhẹ", "di động", "word", "excel"]
-    if any(k in q_lower for k in office_keywords):
+
+    office_keywords = ["van phong", "mong nhe", "sinh vien", "nhe", "di dong", "word", "excel", "office"]
+    if has_any(office_keywords):
         return "OFFICE"
 
-    # Broader category intents
-    phone_keywords = ["điện thoại", "phone", "iphone", "samsung", "galaxy", "pixel", "oppo", "xiaomi", "chụp ảnh", "selfie"]
-    if any(k in q_lower for k in phone_keywords):
+    phone_keywords = [
+        "dien thoai", "smartphone", "phone", "mobile", "android", "ios",
+        "iphone", "samsung", "galaxy", "pixel", "oppo", "xiaomi",
+        "realme", "vivo", "nokia", "chup anh", "selfie"
+    ]
+    if has_any(phone_keywords):
         return "PHONE"
 
-    tablet_keywords = ["máy tính bảng", "tablet", "ipad", "tab"]
-    if any(k in q_lower for k in tablet_keywords):
+    tablet_keywords = ["may tinh bang", "tablet", "ipad", "tab"]
+    if has_any(tablet_keywords):
         return "TABLET"
 
-    accessory_keywords = ["phụ kiện", "accessory", "tai nghe", "headphone", "sạc", "charger", "cáp", "cable", "chuột", "mouse", "pin dự phòng"]
-    if any(k in q_lower for k in accessory_keywords):
+    accessory_keywords = [
+        "phu kien", "accessory", "tai nghe", "headphone", "earbuds", "loa", "ban phim", "keyboard",
+        "sac", "charger", "cap", "cable", "chuot", "mouse", "pin du phong", "power bank"
+    ]
+    if has_any(accessory_keywords):
         return "ACCESSORY"
-        
-    laptop_keywords = ["laptop", "máy tính xách tay", "macbook", "dell", "asus"]
-    if any(k in q_lower for k in laptop_keywords):
+
+    laptop_keywords = [
+        "laptop", "may tinh xach tay", "notebook", "ultrabook", "macbook", "dell", "asus", "lenovo", "hp", "msi", "acer"
+    ]
+    if has_any(laptop_keywords):
+        # gaming already caught above; choose LAPTOP as broader intent
         return "LAPTOP"
-        
+
+    # New intents
+    camera_keywords = ["camera", "chup anh", "zoom", "camera truoc", "camera sau"]
+    if has_any(camera_keywords):
+        return "CAMERA"
+
+    battery_keywords = ["pin", "mah", "thoi luong pin", "pin khoe"]
+    if has_any(battery_keywords):
+        return "BATTERY"
+
+    display_keywords = ["man hinh", "screen", "do phan giai", "oled", "lcd", "amoled"]
+    if has_any(display_keywords):
+        return "DISPLAY"
+
+    storage_keywords = ["ocung", "ssd", "hdd", "gb", "tb", "bo nho" ]
+    if has_any(storage_keywords):
+        return "STORAGE"
+
+    # Business / enterprise
+    business_keywords = ["doanh nghiep", "business", "quan li", "server"]
+    if has_any(business_keywords):
+        return "BUSINESS"
+
     return "GENERAL"
 
 
@@ -273,7 +362,8 @@ def search(req: SearchRequest) -> SearchResponse:
         raise HTTPException(status_code=400, detail="Empty query")
 
     try:
-        q_emb = _embedder.encode([q])
+        embed_text = normalize_for_embed(q)
+        q_emb = _embedder.encode([embed_text])
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Embedding error: {e}")
 
@@ -305,12 +395,14 @@ def search(req: SearchRequest) -> SearchResponse:
             pid = int(meta.get("product_id")) if meta.get("product_id") is not None else None
         except Exception:
             pass
+        # Convert distance to similarity (1 - distance)
+        similarity = 1 - dist if dist is not None else None
         interim.append(
             SearchResult(
                 id=_id,
                 product_id=pid,
                 chunk_index=meta.get("chunk_index"),
-                score=dist,
+                score=similarity,
                 name=meta.get("name"),
                 brand=meta.get("brand"),
                 category_name=meta.get("category_name"),
@@ -346,12 +438,15 @@ def filter_results(query: str, results: List[SearchResult], intent: str = "GENER
     Apply hard filters based on Intent and Query.
     """
     q_lower = query.lower()
+
+    def norm(text: str) -> str:
+        return normalize_for_match(text)
     filtered = []
     
     for r in results:
-        spec_text = (r.spec_text or "").lower()
-        cat_name = (r.category_name or "").lower()
-        name = (r.name or "").lower()
+        spec_text = norm(r.spec_text or "")
+        cat_name = norm(r.category_name or "")
+        name = norm(r.name or "")
         
         # --- STRICT FILTERING BASED ON INTENT ---
         
@@ -359,30 +454,38 @@ def filter_results(query: str, results: List[SearchResult], intent: str = "GENER
         is_valid = True
 
         if intent == "PHONE":
-            if "điện thoại" not in cat_name:
+            cat_ok = any(k in cat_name for k in ["dien thoai", "smartphone", "phone", "mobile"])
+            brand_ok = any(k in name for k in ["iphone", "samsung", "galaxy", "pixel", "oppo", "xiaomi", "vivo", "realme", "nokia"]) or any(k in spec_text for k in ["android", "ios"])
+            signal_ok = (
+                any(k in spec_text for k in ["sim", "lte", "5g", "gsm"]) or
+                re.search(r"\b\d{4,6}\s?mah\b", spec_text) is not None or
+                re.search(r"\b\d{1,3}\s?mp\b", spec_text) is not None
+            )
+            # If category isn't a phone, require BOTH brand cue and phone-specific signals
+            if not (cat_ok or (brand_ok and signal_ok)):
                 is_valid = False
         elif intent == "TABLET":
-            if "máy tính bảng" not in cat_name and "tablet" not in cat_name:
+            if not any(k in cat_name for k in ["may tinh bang", "tablet", "ipad", "tab"]):
                 is_valid = False
         elif intent == "ACCESSORY":
-            if "phụ kiện" not in cat_name:
+            if not any(k in cat_name for k in ["phu kien", "accessory", "chuot", "mouse", "tai nghe", "ban phim", "loa"]):
                 is_valid = False
         elif intent == "LAPTOP":
-            if "laptop" not in cat_name:
+            if not any(k in cat_name for k in ["laptop", "may tinh xach tay", "notebook", "ultrabook", "macbook"]):
                 is_valid = False
         elif intent == "GAMING":
             # 1. Must be a Laptop
-            if "laptop" not in cat_name:
+            if not any(k in cat_name for k in ["laptop", "may tinh xach tay", "notebook", "ultrabook", "macbook"]):
                 is_valid = False
             else:
-                # 2. Must have Discrete GPU
-                has_discrete = any(k in spec_text for k in ["rtx", "gtx", "radeon", "discrete", "nvidia", "amd"])
-                is_integrated = any(k in spec_text for k in ["integrated", "onboard", "intel iris", "uhd graphics"])
-                if is_integrated and not has_discrete:
+                # 2. Must have Discrete GPU (or gaming keyword in name)
+                has_discrete = any(k in spec_text for k in ["rtx", "gtx", "radeon", "geforce", "nvidia", "amd rx", "discrete"])
+                gaming_name = "gaming" in name or any(b in name for b in ["legion", "strix", "tuf gaming", "nitro", "omen", "predator", "aorus"])
+                if not (has_discrete or gaming_name):
                     is_valid = False
         elif intent == "OFFICE":
             # 1. Must be a Laptop
-            if "laptop" not in cat_name:
+            if not any(k in cat_name for k in ["laptop", "may tinh xach tay", "notebook", "ultrabook", "macbook"]):
                 is_valid = False
             else:
                 # 2. Exclude heavy gaming laptops
@@ -468,21 +571,74 @@ def generate_answer(prompt: str) -> str:
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
+    # -1. Out-of-domain guardrail
+    ood = is_out_of_domain(req.query)
+    if ood:
+        return ChatResponse(
+            answer=(
+                f"Dạ, hiện tại Techstore không kinh doanh nhóm sản phẩm {ood}. "
+                "Anh/chị có thể hỏi giúp em về laptop, điện thoại, máy tính bảng, phụ kiện công nghệ ạ."
+            ),
+            context=[]
+        )
     # 0. Intent Detection
     intent = detect_intent(req.query)
     print(f"[chat] Query: '{req.query}' -> Intent: {intent}")
 
     # 1. Retrieval
-    # Fetch more candidates (top_k * 3) to allow for filtering
-    search_req = SearchRequest(query=req.query, top_k=req.top_k * 3)
+    # Fetch more candidates to allow for filtering & backfill
+    # Use a larger pool to improve diversity for strict filters
+    initial_pool = max(req.top_k * 4, 20)
+    search_req = SearchRequest(query=req.query, top_k=initial_pool)
     search_res = search(search_req)
     
     # 2. Filtering with Intent
     filtered_results = filter_results(req.query, search_res.results, intent=intent)
     
-    # 3. Re-ranking (Simple heuristic: prioritize exact matches or specific brands if mentioned)
-    # For now, just take the top_k from filtered
-    final_results = filtered_results[:req.top_k]
+    # 3. Backfill if not enough results after strict filtering
+    final_results = list(filtered_results[:req.top_k])
+
+    if len(final_results) < req.top_k:
+        # Secondary pass: softer category/name cues depending on intent
+        needed = req.top_k - len(final_results)
+        seen_ids = {r.id for r in final_results}
+
+        def add_if(pred):
+            nonlocal needed
+            for r in search_res.results:
+                if needed <= 0:
+                    break
+                if r.id in seen_ids:
+                    continue
+                name = (r.name or "")
+                cat = (r.category_name or "")
+                spec = (r.spec_text or "")
+                if pred(name, cat, spec):
+                    final_results.append(r)
+                    seen_ids.add(r.id)
+                    needed -= 1
+
+        def is_phone_candidate(n: str, c: str, s: str) -> bool:
+            nn = (n or "").lower(); cc = (c or "").lower(); ss = (s or "").lower()
+            cc = unicodedata.normalize('NFKD', cc); cc = ''.join([ch for ch in cc if not unicodedata.combining(ch)])
+            ss = unicodedata.normalize('NFKD', ss); ss = ''.join([ch for ch in ss if not unicodedata.combining(ch)])
+            cat_ok = any(k in cc for k in ["dien thoai", "smartphone", "phone", "mobile"])
+            brand_ok = any(k in nn for k in ["iphone", "samsung", "galaxy", "pixel", "oppo", "xiaomi", "vivo", "realme", "nokia"]) or any(k in ss for k in ["android", "ios"])
+            signal_ok = (
+                any(k in ss for k in ["sim", "lte", "5g", "gsm"]) or
+                re.search(r"\b\d{4,6}\s?mah\b", ss) is not None or
+                re.search(r"\b\d{1,3}\s?mp\b", ss) is not None
+            )
+            return cat_ok or (brand_ok and signal_ok)
+
+        if intent == "GAMING":
+            add_if(lambda n, c, s: any(k in n.lower() for k in ["gaming", "legion", "strix", "nitro", "omen", "predator"]))
+        elif intent == "PHONE":
+            add_if(lambda n, c, s: is_phone_candidate(n, c, s))
+        elif intent == "OFFICE":
+            add_if(lambda n, c, s: any(k in c.lower() for k in ["laptop", "ultrabook"]))
+
+        # Final fallback: do NOT add unrelated items; if không đủ, giữ nguyên số lượng hiện có
     
     if not final_results:
         return ChatResponse(
@@ -490,10 +646,18 @@ def chat(req: ChatRequest):
             context=[]
         )
 
+    # Determine verbose preference from user query (if user asks for details)
+    def detect_verbose(query: str) -> bool:
+        q = query.lower()
+        verbose_triggers = ["chi tiet", "thong so", "cau hinh", "detail", "spec", "đầy đủ", "mô tả", "mo ta"]
+        return any(t in q for t in verbose_triggers)
+
+    verbose = detect_verbose(req.query)
+
     # --- RAG LITE MODE ---
     # Skip heavy LLM generation
-    # Pass intent to template generator
-    answer = generate_answer_lite(final_results, intent=intent)
+    # Pass intent + verbose flag to template generator
+    answer = generate_answer_lite(final_results, intent=intent, verbose=verbose)
     
     return ChatResponse(answer=answer, context=final_results)
 

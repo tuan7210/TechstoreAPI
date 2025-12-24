@@ -97,6 +97,134 @@ namespace TechstoreBackend.Controllers
             }
         }
 
+        // GET: api/Order/revenue-series
+        // Ví dụ:
+        //  - Day-level:   /api/Order/revenue-series?granularity=day&start=2025-12-01&end=2025-12-31
+        //  - Month-level: /api/Order/revenue-series?granularity=month&year=2025
+        //  - Year-level:  /api/Order/revenue-series?granularity=year&start=2020&end=2025
+        [HttpGet("revenue-series")]
+        public async Task<IActionResult> GetRevenueSeries(
+            [FromQuery] string granularity = "day",
+            [FromQuery] string? start = null,
+            [FromQuery] string? end = null,
+            [FromQuery] int? year = null)
+        {
+            try
+            {
+                var paidOrders = _context.OrderTables.Where(o => o.PaymentStatus == "paid");
+
+                if (string.Equals(granularity, "day", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (string.IsNullOrWhiteSpace(start) || string.IsNullOrWhiteSpace(end))
+                    {
+                        return BadRequest(new { success = false, message = "Thiếu tham số start/end cho granularity=day" });
+                    }
+                    if (!DateTime.TryParse(start, out var startDate) || !DateTime.TryParse(end, out var endDate))
+                    {
+                        return BadRequest(new { success = false, message = "Định dạng ngày không hợp lệ. Đúng: yyyy-MM-dd" });
+                    }
+                    if (endDate < startDate)
+                    {
+                        return BadRequest(new { success = false, message = "end phải lớn hơn hoặc bằng start" });
+                    }
+
+                    // Lấy tổng doanh thu theo ngày trong khoảng
+                    var seriesRaw = await paidOrders
+                        .Where(o => o.OrderDate >= startDate.Date && o.OrderDate < endDate.Date.AddDays(1))
+                        .GroupBy(o => o.OrderDate.Date)
+                        .Select(g => new { Date = g.Key, TotalRevenue = g.Sum(x => x.TotalAmount) })
+                        .OrderBy(x => x.Date)
+                        .ToListAsync();
+
+                    // Điền ngày thiếu với 0
+                    var result = new List<object>();
+                    for (var d = startDate.Date; d <= endDate.Date; d = d.AddDays(1))
+                    {
+                        var found = seriesRaw.FirstOrDefault(x => x.Date == d);
+                        var amount = found != null ? found.TotalRevenue : 0m;
+                        result.Add(new { date = d.ToString("yyyy-MM-dd"), totalRevenue = amount });
+                    }
+
+                    return Ok(new { success = true, message = "Lấy chuỗi doanh thu theo ngày thành công", data = result });
+                }
+                else if (string.Equals(granularity, "month", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!(year.HasValue && year.Value > 0))
+                    {
+                        return BadRequest(new { success = false, message = "Thiếu tham số year cho granularity=month" });
+                    }
+
+                    var seriesRaw = await paidOrders
+                        .Where(o => o.OrderDate.Year == year.Value)
+                        .GroupBy(o => o.OrderDate.Month)
+                        .Select(g => new { Month = g.Key, TotalRevenue = g.Sum(x => x.TotalAmount) })
+                        .ToListAsync();
+
+                    var result = new List<object>();
+                    for (int m = 1; m <= 12; m++)
+                    {
+                        var found = seriesRaw.FirstOrDefault(x => x.Month == m);
+                        var amount = found != null ? found.TotalRevenue : 0m;
+                        result.Add(new { month = m, totalRevenue = amount });
+                    }
+
+                    return Ok(new { success = true, message = "Lấy chuỗi doanh thu theo tháng thành công", data = result });
+                }
+                else if (string.Equals(granularity, "year", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (string.IsNullOrWhiteSpace(start) || string.IsNullOrWhiteSpace(end))
+                    {
+                        return BadRequest(new { success = false, message = "Thiếu tham số start/end cho granularity=year" });
+                    }
+
+                    // Cho phép start/end là số năm (vd: 2020) hoặc định dạng ngày
+                    bool startIsYear = int.TryParse(start, out var startYear);
+                    bool endIsYear = int.TryParse(end, out var endYear);
+
+                    if (!startIsYear || !endIsYear)
+                    {
+                        // Fallback: nếu không phải số năm, thử parse DateTime và lấy Year
+                        if (!DateTime.TryParse(start, out var startDate) || !DateTime.TryParse(end, out var endDate))
+                        {
+                            return BadRequest(new { success = false, message = "Tham số start/end không hợp lệ cho granularity=year" });
+                        }
+                        startYear = startDate.Year;
+                        endYear = endDate.Year;
+                    }
+
+                    if (endYear < startYear)
+                    {
+                        return BadRequest(new { success = false, message = "end phải lớn hơn hoặc bằng start" });
+                    }
+
+                    var seriesRaw = await paidOrders
+                        .Where(o => o.OrderDate.Year >= startYear && o.OrderDate.Year <= endYear)
+                        .GroupBy(o => o.OrderDate.Year)
+                        .Select(g => new { Year = g.Key, TotalRevenue = g.Sum(x => x.TotalAmount) })
+                        .OrderBy(x => x.Year)
+                        .ToListAsync();
+
+                    var result = new List<object>();
+                    for (int y = startYear; y <= endYear; y++)
+                    {
+                        var found = seriesRaw.FirstOrDefault(x => x.Year == y);
+                        var amount = found != null ? found.TotalRevenue : 0m;
+                        result.Add(new { year = y, totalRevenue = amount });
+                    }
+
+                    return Ok(new { success = true, message = "Lấy chuỗi doanh thu theo năm thành công", data = result });
+                }
+                else
+                {
+                    return BadRequest(new { success = false, message = "granularity chỉ nhận: day, month, year" });
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Lỗi khi lấy chuỗi doanh thu", error = ex.Message });
+            }
+        }
+
         // GET: api/Order/today-count
         [HttpGet("today-count")]
         
@@ -723,7 +851,20 @@ namespace TechstoreBackend.Controllers
                     }
                 }
 
-                // Không tự động cập nhật paymentStatus khi chuyển trạng thái đơn hàng nữa
+                // Nghiệp vụ COD: khi chuyển trạng thái sang "đã giao", đánh dấu đã thanh toán
+                var normalizedStatus = updateDto.Status?.Trim().ToLower();
+                var paymentMethod = order.PaymentMethod?.Trim().ToLower() ?? string.Empty;
+
+                bool isDelivered = normalizedStatus == "delivered" || normalizedStatus == "completed" ||
+                                   string.Equals(updateDto.Status?.Trim(), "Đã giao", StringComparison.OrdinalIgnoreCase);
+
+                bool isCod = paymentMethod == "cash_on_delivery" || paymentMethod == "cod" ||
+                             paymentMethod == "thanh toán khi nhận hàng" || paymentMethod == "thanh toan khi nhan hang";
+
+                if (isDelivered && isCod)
+                {
+                    order.PaymentStatus = "paid";
+                }
 
                 _context.OrderTables.Update(order);
                 await _context.SaveChangesAsync();

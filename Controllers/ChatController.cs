@@ -8,6 +8,7 @@ using System.Text.Json.Serialization;
 using TechstoreBackend.Data;
 using TechstoreBackend.Models;
 using TechstoreBackend.Models.DTOs;
+using System.IO;
 
 namespace TechstoreBackend.Controllers
 {
@@ -37,9 +38,12 @@ namespace TechstoreBackend.Controllers
                 return BadRequest(new { success = false, message = "Câu hỏi không hợp lệ" });
             }
 
+            // Normalize Vietnamese query for better retrieval
+            var normalizedQuestion = NormalizeVietnameseQuery(req.Question);
+
             int topK = req.TopK <= 0 ? 5 : Math.Min(req.TopK, 10);
             // Try semantic retrieval via Python microservice (Chroma)
-            var svcResults = await QuerySearchServiceAsync(req.Question, topK);
+            var svcResults = await QuerySearchServiceAsync(normalizedQuestion, topK);
 
             List<ChatProductSnippetDto> productSnippets;
             if (svcResults != null && svcResults.Count > 0)
@@ -56,7 +60,7 @@ namespace TechstoreBackend.Controllers
                         Category = r.CategoryName,
                         Price = r.Price ?? 0,
                         Description = !string.IsNullOrWhiteSpace(r.Document) ? r.Document : null,
-                        ImageUrl = r.ImageUrl,
+                        ImageUrl = NormalizeImageUrl(r.ImageUrl),
                         UseCase = string.IsNullOrWhiteSpace(r.UseCase) ? null : r.UseCase,
                         Usp = string.IsNullOrWhiteSpace(r.Usp) ? null : r.Usp,
                         SpecificationsText = string.IsNullOrWhiteSpace(r.SpecText) ? null : r.SpecText
@@ -67,7 +71,7 @@ namespace TechstoreBackend.Controllers
             else
             {
                 // Fallback: simple keyword scoring on DB subset if service unavailable
-                var q = req.Question.Trim();
+                var q = normalizedQuestion.Trim();
                 var terms = q.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                              .Select(t => t.ToLower()).Distinct().ToList();
 
@@ -103,17 +107,17 @@ namespace TechstoreBackend.Controllers
                     Category = x.CategoryName,
                     Price = x.Price,
                     Description = x.Description,
-                    ImageUrl = x.ImageUrl
+                    ImageUrl = NormalizeImageUrl(x.ImageUrl)
                 }).ToList();
             }
 
             var contextText = BuildContextText(productSnippets);
 
-            var (answer, mode) = await TryCallOpenAIAsync(req.Question, contextText);
+            var (answer, mode) = await TryCallOpenAIAsync(normalizedQuestion, contextText);
             if (string.IsNullOrWhiteSpace(answer))
             {
                 // Fallback deterministic answer
-                answer = BuildFallbackAnswer(req.Question, productSnippets);
+                answer = BuildFallbackAnswer(normalizedQuestion, productSnippets);
                 mode = "fallback";
             }
 
@@ -148,6 +152,28 @@ namespace TechstoreBackend.Controllers
         {
             public bool Success { get; set; }
             public List<SearchServiceResult> Results { get; set; } = new();
+        }
+
+        // --- Helpers ---
+        private static string NormalizeImageUrl(string? imageUrl)
+        {
+            if (string.IsNullOrWhiteSpace(imageUrl)) return string.Empty;
+            // Keep absolute URLs
+            if (imageUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return imageUrl;
+            // Extract filename and map to unified image API
+            var fileName = Path.GetFileName(imageUrl);
+            return $"http://localhost:5032/api/Product/image/{fileName}";
+        }
+
+        private static string NormalizeVietnameseQuery(string q)
+        {
+            q = q.ToLowerInvariant();
+            q = q.Replace("pin trâu", "pin dung lượng lớn");
+            q = q.Replace("chơi game", "hiệu năng cao");
+            q = q.Replace("mượt", "hiệu năng ổn định");
+            q = q.Replace("học online", "phục vụ học tập");
+            q = q.Replace("giá rẻ", "phân khúc giá thấp");
+            return q;
         }
 
         private async Task<List<SearchServiceResult>> QuerySearchServiceAsync(string question, int topK)
@@ -239,7 +265,15 @@ namespace TechstoreBackend.Controllers
                 http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
                 http.DefaultRequestHeaders.Add("OpenAI-Beta", "assistants=v2");
 
-                var systemPrompt = "Bạn là trợ lý bán hàng công nghệ, trả lời ngắn gọn, chính xác, bằng tiếng Việt. Chỉ sử dụng thông tin trong Context. Nếu Context không đủ thông tin, hãy trả lời: 'Xin lỗi, hiện tôi chưa có thông tin trong kho dữ liệu.'";
+                var systemPrompt = @"
+Bạn là trợ lý bán hàng công nghệ.
+QUY TẮC BẮT BUỘC:
+- Chỉ tư vấn các sản phẩm có trong Context
+- KHÔNG tự suy đoán thông tin ngoài Context
+- KHÔNG bịa giá, cấu hình, pin, hiệu năng
+- Nếu Context không đủ thông tin → nói rõ là chưa có dữ liệu
+- Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng
+";
                 var userPrompt = $"Câu hỏi: {question}\n\nContext:\n{context}\n\nYêu cầu: Tư vấn 3-5 sản phẩm phù hợp, nêu lý do ngắn gọn, dùng bullet và giá VNĐ. Chỉ dựa trên Context.";
 
                 var payload = new

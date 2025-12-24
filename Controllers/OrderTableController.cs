@@ -70,6 +70,14 @@ namespace TechstoreBackend.Controllers
                     Console.WriteLine($"Sử dụng userId từ token: {currentUserId}");
                 }
 
+                // Nếu phương thức thanh toán là online/PayOS, không cho phép tạo đơn trực tiếp
+                // để tránh lưu đơn khi người dùng chưa thực sự thanh toán.
+                var paymentMethodNormalized = orderDto.PaymentMethod?.Trim().ToLower() ?? string.Empty;
+                var isCod = paymentMethodNormalized == "cash_on_delivery" || paymentMethodNormalized == "cod" ||
+                            paymentMethodNormalized == "thanh toán khi nhận hàng" || paymentMethodNormalized == "thanh toan khi nhan hang";
+
+                
+
                 // Kiểm tra người dùng tồn tại
                 var user = await _context.Users.FindAsync(orderUserId);
                 if (user == null)
@@ -252,13 +260,15 @@ namespace TechstoreBackend.Controllers
             }
 
             var items = await _context.OrderItems
+                .Include(x => x.Product)
                 .Where(x => x.OrderId == order.OrderId)
                 .Select(x => new OrderItemResponseDto
                 {
                     OrderItemId = x.OrderItemId,
                     Price = x.Price,
                     ProductId = x.ProductId,
-                    ProductName = x.Product.Name,
+                    ProductName = x.Product != null ? x.Product.Name : "Unknown",
+                    ImageUrl = x.Product != null ? x.Product.ImageUrl : string.Empty,
                     Quantity = x.Quantity,
                     Subtotal = x.Quantity * x.Price,
                 }).ToListAsync();
@@ -287,7 +297,22 @@ namespace TechstoreBackend.Controllers
                 }
 
                 item.Status = status;
-                item.PaymentStatus = status;
+
+                // Nếu đơn là thanh toán khi nhận hàng (COD) và trạng thái chuyển sang "đã giao",
+                // tự động đánh dấu đã thanh toán.
+                var normalizedStatus = status?.Trim().ToLower();
+                var paymentMethod = item.PaymentMethod?.Trim().ToLower() ?? string.Empty;
+
+                bool isDelivered = normalizedStatus == "delivered" || normalizedStatus == "completed" ||
+                                   string.Equals(status?.Trim(), "Đã giao", StringComparison.OrdinalIgnoreCase);
+
+                bool isCod = paymentMethod == "cod" || paymentMethod == "cash_on_delivery" ||
+                             paymentMethod == "thanh toán khi nhận hàng" || paymentMethod == "thanh toan khi nhan hang";
+
+                if (isDelivered && isCod)
+                {
+                    item.PaymentStatus = "paid";
+                }
                 _context.OrderTables.Update(item);
                 await _context.SaveChangesAsync();
 
