@@ -1,38 +1,32 @@
-# Ingestion: Product Extract
 
-Small extractor to pull product data from MySQL and write JSONL for vectorization.
+# TechStore AI Ingestion & Semantic Search Pipeline
 
-## What it does
-- Connects to MySQL using env vars (or .env if present)
-- Detects optional `use_case` and `usp` columns dynamically
-- Parses `specifications` JSON safely
-- Writes `ingestion/output/products.jsonl`
-- Builds content text (name, brand, category, description, use_case, usp, specifications)
-- Optional: chunks content and embeds into ChromaDB with metadata
+This module powers the AI product search and chat for TechStore. It extracts product data from MySQL, builds a semantic vector store (ChromaDB), and serves fast, relevant search for the AI chatbox and backend.
 
-## Env vars
-- `DB_HOST` (default: localhost)
-- `DB_PORT` (default: 3306)
-- `DB_USER` (required)
-- `DB_PASSWORD` (required)
-- `DB_NAME` (default: tech_store)
-- `OUTPUT_PATH` (default: ingestion/output/products.jsonl)
- - `ENABLE_EMBED` (default: false) — set to true to embed into Chroma
- - `CHROMA_PATH` (default: ingestion/chroma)
- - `COLLECTION_NAME` (default: products)
- - `EMBED_MODEL` (default: sentence-transformers/all-MiniLM-L6-v2)
- - `EMBED_BATCH` (default: 64)
- - `CHUNK_SIZE` (default: 1200), `CHUNK_OVERLAP` (default: 150)
- - `OPENAI_API_KEY` (optional) — if provided and sentence-transformers not installed, can use OpenAI embeddings
+---
 
-## Install deps
-```bash
-# Windows PowerShell example:
+## Features
+- Extracts product data from MySQL and writes to `ingestion/output/products.jsonl` (one product per line, JSON format)
+- Supports dynamic fields: `use_case`, `usp`, and nested `specifications`
+- Embeds product content into ChromaDB for semantic search (RAG)
+- Metadata includes: name, brand, category, price, image_url, use_case, usp, spec_text
+- FastAPI microservice for semantic search (used by .NET backend)
+- Supports both local sentence-transformers and OpenAI embeddings
+- Optional: Cross-Encoder re-ranking for higher answer quality
+
+---
+
+## 1. Setup & Dependencies
+
+```powershell
 python -m pip install -r ingestion/requirements.txt
 ```
 
-## Thiết lập thông tin kết nối MySQL (khuyên dùng .env khi dev)
-Script `extract_products.py` sẽ tự động đọc file `.env` (nhờ `python-dotenv`). Bạn tạo file `ingestion/.env` với nội dung ví dụ:
+---
+
+## 2. Extract Products from MySQL
+
+Configure your DB connection in `ingestion/.env` (recommended):
 
 ```
 DB_HOST=localhost
@@ -40,99 +34,116 @@ DB_PORT=3306
 DB_USER=your_user
 DB_PASSWORD=your_password
 DB_NAME=tech_store
-ENABLE_EMBED=true
-CHROMA_PATH=ingestion/chroma
-COLLECTION_NAME=products
-EMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2
+OUTPUT_PATH=ingestion/output/products.jsonl
+ENABLE_EMBED=false
 ```
 
-Sau đó chỉ cần chạy:
+Extract only (no embedding):
 ```powershell
 python ingestion/extract_products.py
 ```
 
-Bạn vẫn có thể override nhanh bằng biến môi trường tạm thời trong PowerShell:
+You can override env vars inline:
 ```powershell
-$env:ENABLE_EMBED="true"; $env:DB_USER="root"; $env:DB_PASSWORD="24102003"; python ingestion/extract_products.py
-```
-Nhưng cách dùng `.env` thuận tiện hơn, ít phải gõ lại và tránh lộ mật khẩu trong lịch sử terminal screenshot.
-
-## Run (extract only)
-```bash
-# Windows PowerShell example:
-python ingestion/extract_products.py
+$env:DB_USER="root"; $env:DB_PASSWORD="yourpass"; python ingestion/extract_products.py
 ```
 
-The output file will contain one JSON object per line:
+Output: Each line in `ingestion/output/products.jsonl` is a product object:
 ```json
-{"product_id": 1, "name": "iPhone 15 128GB", "description": "...", "brand": "Apple", "use_case": "", "usp": "", "specifications": {"screen": "6.1 inch ..."}}
+{"product_id": 1, "name": "iPhone 15 128GB", "description": "...", "brand": "Apple", ...}
 ```
 
-## Run with embedding to Chroma
-```bash
+---
+
+## 3. Embed Products to Chroma (Vector Store)
+
+Set `ENABLE_EMBED=true` in `.env` or as an env var:
+```powershell
 $env:ENABLE_EMBED="true"
 python ingestion/extract_products.py
 ```
-This will create or reuse a collection under `ingestion/chroma` and upsert chunked documents with metadata.
+or, if you already have a products.jsonl:
+```powershell
+python ingestion/embed_existing_products.py
+```
 
-## Start semantic search service (microservice)
-This tiny FastAPI service queries the persisted Chroma collection so the .NET backend can retrieve top‑k results semantically.
-
-### Env vars
+Key embedding env vars:
 - `CHROMA_PATH` (default: ingestion/chroma)
 - `COLLECTION_NAME` (default: products)
-- `EMBED_MODEL` (default: sentence-transformers/all-MiniLM-L6-v2)
-- `OPENAI_API_KEY` (optional; fallback for embeddings if ST not available)
-- `OPENAI_EMBED_MODEL` (default: text-embedding-3-small)
-- `SERVICE_HOST` (default: 0.0.0.0)
-- `SERVICE_PORT` (default: 8000)
-- `ENABLE_RERANK` (default: false) — bật Cross-Encoder re-rank sau truy vấn vector
-- `CROSS_ENCODER_MODEL` (default: cross-encoder/ms-marco-MiniLM-L-6-v2)
-- `RERANK_POOL` (default: 0) — số lượng kết quả thô ban đầu để re-rank (0 = tự động lấy top_k*2, tối đa 50)
+- `EMBED_MODEL` (default: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2)
+- `OPENAI_API_KEY` (optional, fallback for embeddings)
 
-### Run (Windows PowerShell)
+---
+
+## 4. Start the Semantic Search Service
+
+This FastAPI microservice serves semantic search for the .NET backend and chatbox.
+
 ```powershell
-# ensure embeddings exist (ENABLE_EMBED=true run done at least once)
-# start the microservice
 python -m uvicorn ingestion.search_service:app --host 0.0.0.0 --port 8000
 ```
 
-#### Bật re-rank (tùy chọn)
+### Service Env Vars
+- `CHROMA_PATH`, `COLLECTION_NAME`, `EMBED_MODEL`, `OPENAI_API_KEY`, `OPENAI_EMBED_MODEL`
+- `SERVICE_HOST`, `SERVICE_PORT` (default: 0.0.0.0:8000)
+- `ENABLE_RERANK` (default: false)
+- `CROSS_ENCODER_MODEL`, `RERANK_POOL`
+
+#### Enable Cross-Encoder Re-Rank (optional)
 ```powershell
 $env:ENABLE_RERANK="true"
 $env:CROSS_ENCODER_MODEL="cross-encoder/ms-marco-MiniLM-L-6-v2"
 python -m uvicorn ingestion.search_service:app --host 0.0.0.0 --port 8000
 ```
-Re-rank sẽ: lấy thêm pool kết quả (ví dụ top_k*2), tính điểm lại bằng mô hình cross-encoder rồi sắp xếp theo `cross_score`.
 
-### cURL quick test (optional)
+#### Quick Test
 ```powershell
 curl -X POST http://localhost:8000/search -H "Content-Type: application/json" -d '{"query":"laptop gaming mỏng nhẹ","top_k":5}'
 ```
 
-The .NET API should call this service at `http://localhost:8000/search` (configurable via `SEARCH_SERVICE_URL`).
+---
 
-## RAG‑only mode (no fine‑tuning)
-This project now uses Retrieval‑Augmented Generation only:
+## 5. Workflow: Update Data & Re-Embed
 
-- Extract products and (optionally) embed to Chroma.
-- Start the FastAPI search service.
-- The .NET backend composes a strict RAG prompt and calls a chat model/API.
+1. Update your MySQL product data and images
+2. Export fresh `products.jsonl` (step 2)
+3. (Optional) Remove old Chroma vector store:
+	```powershell
+	Remove-Item -Recurse -Force .\ingestion\chroma
+	```
+4. Re-embed:
+	```powershell
+	python ingestion/embed_existing_products.py
+	```
+5. Restart the semantic search service
 
-No fine‑tuning scripts or Q&A datasets are required anymore. If you previously created `ingestion/datasets/*` or used LoRA scripts, you can safely ignore them.
+---
 
-### Embed without database
-If you already have `ingestion/output/products.jsonl` and only need to build the Chroma vector store (no MySQL connection), run:
-```powershell
-python ingestion/embed_existing_products.py
-```
-Set env vars (optional): `PRODUCTS_PATH`, `CHROMA_PATH`, `COLLECTION_NAME`, `EMBED_MODEL`.
+## 6. RAG-Only (No Fine-Tuning Needed)
 
-## Nâng cấp retrieval (đã triển khai)
-- Metadata lưu thêm: `use_case`, `usp`, `spec_text` (thông số đã flatten) cho từng chunk.
-- Search service trả về các trường này để backend dựng context giàu cấu trúc.
-- Tuỳ chọn re-rank Cross-Encoder: bật bằng `ENABLE_RERANK=true`.
+- No LLM fine-tuning or Q&A datasets required
+- All answers are generated via Retrieval-Augmented Generation (RAG) using up-to-date product data
 
-### Lưu ý hiệu năng
-- Cross-Encoder sẽ chậm hơn (thường +20–80ms tuỳ số lượng pool). Giữ `top_k` nhỏ (3–8) để trải nghiệm tốt.
-- Nếu latency quá cao: tắt re-rank (`ENABLE_RERANK=false`) hoặc giảm `RERANK_POOL`.
+---
+
+## 7. Advanced: Metadata & Performance
+
+- Each vector includes rich metadata: `use_case`, `usp`, `spec_text`, `image_url`, etc.
+- Cross-Encoder re-rank improves answer quality but increases latency (keep `top_k` small for best UX)
+- If latency is high, disable re-rank or reduce `RERANK_POOL`
+
+---
+
+## 8. Troubleshooting
+
+- If images do not display, ensure the `image_url` in `products.jsonl` matches the filename in your backend image storage and is served by your API
+- Always re-embed after updating product data or images
+
+---
+
+## 9. References
+
+- [ChromaDB Documentation](https://docs.trychroma.com/)
+- [sentence-transformers](https://www.sbert.net/)
+- [FastAPI](https://fastapi.tiangolo.com/)
+- [Uvicorn](https://www.uvicorn.org/)
